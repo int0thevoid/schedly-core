@@ -1,0 +1,30 @@
+/* Schedly Design Tokens — Default theme (override in consuming project) */
+:root {
+  /* Primary palette */
+  --schedly-color-primary: #5a8450;
+  --schedly-color-primary-dark: #466840;
+  --schedly-color-primary-light: #9ab88e;
+  --schedly-color-primary-faint: #f2f5f0;
+  --schedly-color-primary-subtle: #e2eadd;
+
+  /* Accent palette */
+  --schedly-color-accent: #d4583a;
+  --schedly-color-accent-dark: #b8422a;
+  --schedly-color-accent-light: #fae5db;
+  --schedly-color-accent-faint: #fdf4f0;
+
+  /* Surface colors */
+  --schedly-color-background: #f9f5ec;
+  --schedly-color-surface: #fdfcf8;
+  --schedly-color-surface-elevated: #f2ebd7;
+  --schedly-color-surface-border: #e8dcc0;
+
+  /* Text colors */
+  --schedly-color-text: #47453c;
+  --schedly-color-text-subtle: #8a7f6e;
+
+  /* Border radius */
+  --schedly-radius-button: 0.5rem;
+  --schedly-radius-card: 1rem;
+  --schedly-radius-section: 1.5rem;
+}
