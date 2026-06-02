@@ -207,6 +207,21 @@ importers:
 
   .: {}
 
+  packages/admin: {}
+
+  packages/booking:
+    devDependencies:
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(jsdom@29.1.1)(vite@8.0.16)
+
+  packages/notifications: {}
+
+  packages/payments: {}
+
   packages/ui:
     devDependencies:
       '@testing-library/jest-dom':
