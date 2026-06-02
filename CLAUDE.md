@@ -33,6 +33,19 @@ las variables `--schedly-*` en su CSS.
 - Tests: Vitest + Testing Library
 - Estilo: TypeScript estricto, sin `any`
 
+## Política de merges
+
+En este proyecto el merge es automático después de que el CI esté verde.
+No se requiere revisión manual.
+
+Después de abrir cada PR:
+1. Esperar que el CI pase: `gh pr checks [número] --watch`
+2. Si CI verde → hacer merge inmediatamente: `gh pr merge [número] --merge --delete-branch`
+3. Actualizar local: `git pull origin develop`
+4. Continuar con la siguiente tarea
+
+Aplicar esta política a **todos** los PRs en este repositorio.
+
 ## Comandos
 
 ```bash
