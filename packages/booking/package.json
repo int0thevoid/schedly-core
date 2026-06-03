@@ -8,7 +8,11 @@
     "generate": "prisma generate",
     "build": "tsc",
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "pnpm seed"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -17,6 +21,7 @@
     "@types/supertest": "^7.2.0",
     "prisma": "^7.8.0",
     "supertest": "^7.2.2",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"
   },
