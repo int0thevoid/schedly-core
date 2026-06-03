@@ -10,7 +10,14 @@
     "lint": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/pg": "^8.20.0",
+    "prisma": "^7.8.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "pg": "^8.21.0"
   }
 }

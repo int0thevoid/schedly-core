@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Professional {
+  id    String @id @default(cuid())
+  name  String
+  email String @unique
+  phone String?
+  timezone String @default("America/Santiago")
+
+  bookingWindowWeeks     Int @default(4)
+  minAdvanceBusinessDays Int @default(2)
+  defaultBufferMinutes   Int @default(0)
+
+  services        Service[]
+  weeklySchedules WeeklySchedule[]
+  scheduleBlocks  ScheduleBlock[]
+  appointments    Appointment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Service {
+  id             String  @id @default(cuid())
+  professionalId String
+  name           String
+  description    String
+  duration       Int
+  price          Int
+  modality       String
+  bufferMinutes  Int?
+  isActive       Boolean @default(true)
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+  appointments Appointment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WeeklySchedule {
+  id             String   @id @default(cuid())
+  professionalId String
+  dayOfWeek      Int
+  startTime      String
+  endTime        String
+  serviceIds     String[]
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ScheduleBlock {
+  id             String    @id @default(cuid())
+  professionalId String
+  title          String
+  startDateTime  DateTime
+  endDateTime    DateTime
+  recurrenceType String?
+  recurrenceEnd  DateTime?
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Appointment {
+  id             String @id @default(cuid())
+  professionalId String
+  serviceId      String
+
+  clientName  String
+  clientEmail String
+  clientPhone String
+
+  startDateTime DateTime
+  endDateTime   DateTime
+  modality      String
+  status        String   @default("pending")
+
+  paymentStatus String @default("unpaid")
+  paymentAmount Int?
+
+  notes String?
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+  service      Service      @relation(fields: [serviceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  name         String
+  phone        String?
+  passwordHash String?
+  isVerified   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
