@@ -7,6 +7,7 @@ export interface Service {
   currency: 'CLP'
   modality: 'presential' | 'online' | 'both'
   isActive: boolean
+  bufferMinutes?: number // sobreescribe ProfessionalConfig.defaultBufferMinutes si está definido
 }
 
 export interface WeeklySchedule {
@@ -47,4 +48,18 @@ export interface TimeSlot {
   startDateTime: Date
   endDateTime: Date
   isAvailable: boolean
+}
+
+export interface ProfessionalConfig {
+  bookingWindowWeeks: number       // default: 4 — cuántas semanas hacia adelante se puede agendar
+  minAdvanceBusinessDays: number   // default: 2 — anticipación mínima en días hábiles (L-V)
+  defaultBufferMinutes: number     // default: 0 — buffer entre sesiones (global)
+  timezone: string                 // default: 'America/Santiago'
+}
+
+export const DEFAULT_PROFESSIONAL_CONFIG: ProfessionalConfig = {
+  bookingWindowWeeks: 4,
+  minAdvanceBusinessDays: 2,
+  defaultBufferMinutes: 0,
+  timezone: 'America/Santiago',
 }

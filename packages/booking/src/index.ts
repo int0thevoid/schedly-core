@@ -1,5 +1,6 @@
 // Types
-export type { Service, WeeklySchedule, ScheduleBlock, Appointment, TimeSlot } from './types'
+export type { Service, WeeklySchedule, ScheduleBlock, Appointment, TimeSlot, ProfessionalConfig } from './types'
+export { DEFAULT_PROFESSIONAL_CONFIG } from './types'
 
 // Availability logic
 export {
@@ -8,4 +9,6 @@ export {
   filterOccupiedSlots,
   getAvailableSlots,
   doesBlockApplyToDate,
+  getMinBookingDateTime,
+  getMaxBookingDateTime,
 } from './availability'

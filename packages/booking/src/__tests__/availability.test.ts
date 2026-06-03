@@ -5,8 +5,10 @@ import {
   filterOccupiedSlots,
   getAvailableSlots,
   doesBlockApplyToDate,
+  getMinBookingDateTime,
+  getMaxBookingDateTime,
 } from '../availability'
-import type { Appointment, ScheduleBlock, Service, TimeSlot, WeeklySchedule } from '../types'
+import type { Appointment, ProfessionalConfig, ScheduleBlock, Service, TimeSlot, WeeklySchedule } from '../types'
 
 // ─── Helpers de test ─────────────────────────────────────────────────────────
 
@@ -510,5 +512,244 @@ describe('getAvailableSlots', () => {
     )
     const available = getAvailableSlots(MONDAY_JAN_15, SERVICE_45, SCHEDULE_MON_FRI, [block], [])
     expect(available).toHaveLength(0)
+  })
+})
+
+// ─── Fixtures adicionales ────────────────────────────────────────────────────
+
+const DEFAULT_CONFIG: ProfessionalConfig = {
+  bookingWindowWeeks: 4,
+  minAdvanceBusinessDays: 2,
+  defaultBufferMinutes: 0,
+  timezone: 'America/Santiago',
+}
+
+// ─── getMinBookingDateTime ───────────────────────────────────────────────────
+
+describe('getMinBookingDateTime', () => {
+  // Con minAdvanceBusinessDays=2 y now en día X:
+  // avanzamos de día en día desde mañana contando sólo L–V hasta completar 2
+
+  it('hoy lunes → mínimo miércoles', () => {
+    // now = lunes 15 ene 2024 (mediodía UTC = 09:00 Santiago)
+    const now = new Date('2024-01-15T12:00:00Z')
+    const min = getMinBookingDateTime(now, 2, 'America/Santiago')
+    expect(toSantiagoDate(min)).toBe('2024-01-17') // miércoles
+  })
+
+  it('hoy jueves → mínimo lunes siguiente', () => {
+    // now = jueves 18 ene 2024
+    const now = new Date('2024-01-18T12:00:00Z')
+    const min = getMinBookingDateTime(now, 2, 'America/Santiago')
+    // viernes(1) → sáb/dom skip → lunes(2)
+    expect(toSantiagoDate(min)).toBe('2024-01-22')
+  })
+
+  it('hoy viernes → mínimo martes siguiente', () => {
+    const now = new Date('2024-01-19T12:00:00Z') // viernes 19 ene
+    const min = getMinBookingDateTime(now, 2, 'America/Santiago')
+    // sáb/dom skip → lunes(1) → martes(2)
+    expect(toSantiagoDate(min)).toBe('2024-01-23')
+  })
+
+  it('hoy sábado → mínimo martes siguiente', () => {
+    const now = new Date('2024-01-20T12:00:00Z') // sábado 20 ene
+    const min = getMinBookingDateTime(now, 2, 'America/Santiago')
+    // dom skip → lunes(1) → martes(2)
+    expect(toSantiagoDate(min)).toBe('2024-01-23')
+  })
+
+  it('hoy domingo → mínimo martes siguiente', () => {
+    const now = new Date('2024-01-21T12:00:00Z') // domingo 21 ene
+    const min = getMinBookingDateTime(now, 2, 'America/Santiago')
+    // lunes(1) → martes(2)
+    expect(toSantiagoDate(min)).toBe('2024-01-23')
+  })
+
+  it('retorna el inicio del día (00:00:00) en Santiago', () => {
+    const now = new Date('2024-01-15T12:00:00Z') // lunes
+    const min = getMinBookingDateTime(now, 2, 'America/Santiago')
+    // Debe ser las 00:00:00 Santiago (= 03:00 UTC en verano UTC-3)
+    expect(toSantiagoHHMM(min)).toBe('00:00')
+  })
+
+  it('minAdvanceBusinessDays=1 → mañana si mañana es hábil', () => {
+    const now = new Date('2024-01-15T12:00:00Z') // lunes
+    const min = getMinBookingDateTime(now, 1, 'America/Santiago')
+    expect(toSantiagoDate(min)).toBe('2024-01-16') // martes
+  })
+})
+
+// ─── getMaxBookingDateTime ───────────────────────────────────────────────────
+
+describe('getMaxBookingDateTime', () => {
+  it('bookingWindowWeeks: 4 → exactamente 28 días después en Santiago', () => {
+    const now = new Date('2024-01-15T12:00:00Z') // lunes 15 enero
+    const max = getMaxBookingDateTime(now, 4, 'America/Santiago')
+    // 15 ene + 28 días = 12 feb
+    expect(toSantiagoDate(max)).toBe('2024-02-12')
+  })
+
+  it('bookingWindowWeeks: 2 → 14 días después', () => {
+    const now = new Date('2024-01-15T12:00:00Z')
+    const max = getMaxBookingDateTime(now, 2, 'America/Santiago')
+    expect(toSantiagoDate(max)).toBe('2024-01-29')
+  })
+
+  it('retorna el final del día (23:59) en Santiago', () => {
+    const now = new Date('2024-01-15T12:00:00Z')
+    const max = getMaxBookingDateTime(now, 4, 'America/Santiago')
+    expect(toSantiagoHHMM(max)).toBe('23:59')
+  })
+
+  it('max > min siempre que bookingWindowWeeks >= 1', () => {
+    const now = new Date('2024-01-15T12:00:00Z')
+    const min = getMinBookingDateTime(now, 2, 'America/Santiago')
+    const max = getMaxBookingDateTime(now, 1, 'America/Santiago')
+    expect(max.getTime()).toBeGreaterThan(min.getTime())
+  })
+})
+
+// ─── generateDaySlots con buffer ────────────────────────────────────────────
+
+describe('generateDaySlots con bufferMinutes', () => {
+  it('buffer=0 → comportamiento idéntico al original (13 slots de 45 min)', () => {
+    const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45, 0)
+    expect(slots).toHaveLength(13)
+    expect(toSantiagoHHMM(slots[0].startDateTime)).toBe('09:00')
+    expect(toSantiagoHHMM(slots[1].startDateTime)).toBe('09:45')
+  })
+
+  it('sesión 45min + buffer 15min → siguiente slot a los 60min', () => {
+    const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45, 15)
+    // Intervalo = 60 min → 09:00, 10:00, 11:00...
+    expect(toSantiagoHHMM(slots[0].startDateTime)).toBe('09:00')
+    expect(toSantiagoHHMM(slots[1].startDateTime)).toBe('10:00')
+    expect(toSantiagoHHMM(slots[2].startDateTime)).toBe('11:00')
+  })
+
+  it('sesión 45min + buffer 15min → 10 slots en 09:00-19:00', () => {
+    // 600 min / 60 min = 10 slots
+    const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45, 15)
+    expect(slots).toHaveLength(10)
+  })
+
+  it('cada slot dura sólo la duración del servicio (sin incluir el buffer)', () => {
+    const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45, 15)
+    slots.forEach(slot => {
+      const durationMin = (slot.endDateTime.getTime() - slot.startDateTime.getTime()) / 60000
+      expect(durationMin).toBe(45)
+    })
+  })
+
+  it('sesión 60min + buffer 30min → 7 slots en 09:00-19:00', () => {
+    // Intervalo 90 min. Slots: 09:00, 10:30, 12:00, 13:30, 15:00, 16:30, 18:00
+    // El último slot (18:00-19:00) cabe porque 18:00+60min = 19:00 = endTime
+    const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 60, 30)
+    expect(slots).toHaveLength(7)
+    expect(toSantiagoHHMM(slots[0].startDateTime)).toBe('09:00')
+    expect(toSantiagoHHMM(slots[1].startDateTime)).toBe('10:30')
+  })
+})
+
+// ─── getAvailableSlots con config ────────────────────────────────────────────
+
+describe('getAvailableSlots con ProfessionalConfig', () => {
+  // now fijo para todos los tests de esta sección
+  // now = lunes 15 ene 2024 → min = miércoles 17 ene, max = lunes 12 feb (con defaults)
+  const NOW = new Date('2024-01-15T12:00:00Z')
+
+  it('usa buffer del servicio si está definido (sobreescribe el global)', () => {
+    const serviceWithBuffer: Service = { ...SERVICE_45, bufferMinutes: 15 }
+    const config: ProfessionalConfig = { ...DEFAULT_CONFIG, defaultBufferMinutes: 30 }
+
+    // buffer efectivo = 15 (del servicio), no 30 (del global)
+    // intervalo = 45+15=60 → 10 slots
+    const wednesday = new Date('2024-01-17T12:00:00Z')
+    const slots = getAvailableSlots(wednesday, serviceWithBuffer, config, SCHEDULE_MON_FRI, [], [], NOW)
+    expect(slots).toHaveLength(10)
+    expect(toSantiagoHHMM(slots[1].startDateTime)).toBe('10:00') // gap de 60 min
+  })
+
+  it('usa buffer global cuando el servicio no tiene bufferMinutes', () => {
+    const config: ProfessionalConfig = { ...DEFAULT_CONFIG, defaultBufferMinutes: 15 }
+    // SERVICE_45 no tiene bufferMinutes → usa 15 del config → intervalo 60 min → 10 slots
+    const wednesday = new Date('2024-01-17T12:00:00Z')
+    const slots = getAvailableSlots(wednesday, SERVICE_45, config, SCHEDULE_MON_FRI, [], [], NOW)
+    expect(slots).toHaveLength(10)
+  })
+
+  it('sin buffer (defaultBufferMinutes=0) → 13 slots de 45 min', () => {
+    const wednesday = new Date('2024-01-17T12:00:00Z')
+    const slots = getAvailableSlots(wednesday, SERVICE_45, DEFAULT_CONFIG, SCHEDULE_MON_FRI, [], [], NOW)
+    expect(slots).toHaveLength(13)
+  })
+
+  it('slot antes del mínimo → no disponible (día completo bloqueado por ventana)', () => {
+    // now = lunes 15 → min = miércoles 17
+    // querying martes 16 (antes del mínimo)
+    const tuesday = new Date('2024-01-16T12:00:00Z')
+    const slots = getAvailableSlots(tuesday, SERVICE_45, DEFAULT_CONFIG, SCHEDULE_MON_FRI, [], [], NOW)
+    expect(slots).toHaveLength(0)
+  })
+
+  it('slot después del máximo → no disponible', () => {
+    // now = lunes 15 → max = 12 feb (4 semanas = 28 días)
+    // querying 13 feb (un día después del máximo)
+    const afterMax = new Date('2024-02-13T12:00:00Z') // martes 13 feb
+    const slots = getAvailableSlots(afterMax, SERVICE_45, DEFAULT_CONFIG, SCHEDULE_MON_FRI, [], [], NOW)
+    expect(slots).toHaveLength(0)
+  })
+
+  it('slot dentro de la ventana → disponible si no bloqueado', () => {
+    // now = lunes 15 → min = miércoles 17, max = 12 feb
+    // querying miércoles 24 enero (dentro del rango)
+    const wednesday24 = new Date('2024-01-24T12:00:00Z')
+    const slots = getAvailableSlots(wednesday24, SERVICE_45, DEFAULT_CONFIG, SCHEDULE_MON_FRI, [], [], NOW)
+    expect(slots.length).toBeGreaterThan(0)
+    expect(slots.every(s => s.isAvailable)).toBe(true)
+  })
+
+  it('el día exacto del mínimo (miércoles 17) está disponible', () => {
+    const minDay = new Date('2024-01-17T12:00:00Z')
+    const slots = getAvailableSlots(minDay, SERVICE_45, DEFAULT_CONFIG, SCHEDULE_MON_FRI, [], [], NOW)
+    expect(slots.length).toBeGreaterThan(0)
+  })
+
+  it('el día exacto del máximo (12 feb) está disponible', () => {
+    const maxDay = new Date('2024-02-12T12:00:00Z') // lunes
+    const slots = getAvailableSlots(maxDay, SERVICE_45, DEFAULT_CONFIG, SCHEDULE_MON_FRI, [], [], NOW)
+    expect(slots.length).toBeGreaterThan(0)
+  })
+
+  it('combina ventana + bloqueo + cita correctamente', () => {
+    const day = new Date('2024-01-17T12:00:00Z') // miércoles 17, dentro del rango
+
+    // Bloqueo de 09:00 a 09:45 → primer slot bloqueado
+    const block = makeBlock(
+      makeSantiagoDate('2024-01-17', '09:00').toISOString(),
+      makeSantiagoDate('2024-01-17', '09:45').toISOString(),
+    )
+
+    // Cita de 09:45 a 10:30 → segundo slot ocupado
+    const apt = makeAppointment(
+      makeSantiagoDate('2024-01-17', '09:45'),
+      makeSantiagoDate('2024-01-17', '10:30'),
+    )
+
+    const slots = getAvailableSlots(day, SERVICE_45, DEFAULT_CONFIG, SCHEDULE_MON_FRI, [block], [apt], NOW)
+    const times = slots.map(s => toSantiagoHHMM(s.startDateTime))
+
+    expect(times).not.toContain('09:00') // bloqueado
+    expect(times).not.toContain('09:45') // ocupado por cita
+    expect(times).toContain('10:30')     // libre y dentro del rango
+  })
+
+  it('sin now explícito usa new Date() internamente (smoke test)', () => {
+    // Sólo verifica que no lanza excepción; el resultado depende del tiempo real
+    const day = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) // +10 días
+    expect(() =>
+      getAvailableSlots(day, SERVICE_45, DEFAULT_CONFIG, SCHEDULE_MON_FRI, [], []),
+    ).not.toThrow()
   })
 })
