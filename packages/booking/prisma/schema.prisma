@@ -18,6 +18,12 @@ model Professional {
   minAdvanceBusinessDays Int @default(2)
   defaultBufferMinutes   Int @default(0)
 
+  transferRut           String?
+  transferBank          String?
+  transferAccountType   String?
+  transferAccountNumber String?
+  transferEmail         String?
+
   services        Service[]
   weeklySchedules WeeklySchedule[]
   scheduleBlocks  ScheduleBlock[]

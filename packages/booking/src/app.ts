@@ -9,6 +9,7 @@ import appointmentsRouter from './routes/appointments.js'
 import adminAppointmentsRouter from './routes/admin/appointments.js'
 import adminScheduleRouter from './routes/admin/schedule.js'
 import adminConfigRouter from './routes/admin/config.js'
+import adminTransferRouter from './routes/admin/transfer.js'
 import { fail } from './lib/response.js'
 
 const ALLOWED_ORIGINS = [
@@ -31,6 +32,7 @@ app.use('/api/admin', requireAuth)
 app.use('/api/admin/appointments', adminAppointmentsRouter)
 app.use('/api/admin/schedule', adminScheduleRouter)
 app.use('/api/admin/config', adminConfigRouter)
+app.use('/api/admin/transfer-config', adminTransferRouter)
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err)
