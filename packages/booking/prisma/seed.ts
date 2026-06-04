@@ -9,9 +9,17 @@ const prisma = new PrismaClient({ adapter })
 async function main() {
   console.log('🌱 Seeding Stefany Osorio Alfaro...')
 
+  const transferPlaceholder = {
+    transferRut:           'XX.XXX.XXX-X (por confirmar)',
+    transferBank:          null,
+    transferAccountType:   null,
+    transferAccountNumber: null,
+    transferEmail:         null,
+  }
+
   const professional = await prisma.professional.upsert({
     where: { email: 'stefanyosorioalfaro@gmail.com' },
-    update: {},
+    update: transferPlaceholder,
     create: {
       name: 'Ps. Stefany Osorio Alfaro',
       email: 'stefanyosorioalfaro@gmail.com',
@@ -20,6 +28,7 @@ async function main() {
       bookingWindowWeeks: 4,
       minAdvanceBusinessDays: 2,
       defaultBufferMinutes: 15,
+      ...transferPlaceholder,
     },
   })
   console.log(`✅ Professional: ${professional.name} (${professional.id})`)
