@@ -3,6 +3,11 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
 
+const weeklySchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be YYYY-MM-DD'),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'endDate must be YYYY-MM-DD'),
+})
+
 const listSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   status: z.enum(['pending', 'confirmed', 'cancelled', 'completed']).optional(),
@@ -17,6 +22,44 @@ const paymentSchema = z.object({
   paymentStatus: z.literal('paid'),
   paymentAmount: z.number().int().positive(),
 })
+
+export async function listWeeklyAppointments(req: Request, res: Response): Promise<void> {
+  const parsed = weeklySchema.safeParse(req.query)
+  if (!parsed.success) {
+    fail(res, parsed.error.issues[0]?.message ?? 'Invalid params', 400)
+    return
+  }
+
+  const { startDate, endDate } = parsed.data
+  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      professionalId,
+      startDateTime: {
+        gte: new Date(`${startDate}T00:00:00.000Z`),
+        lte: new Date(`${endDate}T23:59:59.999Z`),
+      },
+    },
+    include: { service: true },
+    orderBy: { startDateTime: 'asc' },
+  })
+
+  // Seed all dates in range with empty arrays, then fill with appointments
+  const grouped: Record<string, typeof appointments> = {}
+  const cursor = new Date(`${startDate}T00:00:00.000Z`)
+  const rangeEnd = new Date(`${endDate}T00:00:00.000Z`)
+  while (cursor <= rangeEnd) {
+    grouped[cursor.toISOString().slice(0, 10)] = []
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  for (const apt of appointments) {
+    const key = apt.startDateTime.toISOString().slice(0, 10)
+    if (key in grouped) grouped[key].push(apt)
+  }
+
+  ok(res, grouped)
+}
 
 export async function listAdminAppointments(req: Request, res: Response): Promise<void> {
   const parsed = listSchema.safeParse(req.query)
