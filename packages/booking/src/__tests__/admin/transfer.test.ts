@@ -68,9 +68,10 @@ describe('GET /api/admin/transfer-config', () => {
     expect(res.status).toBe(404)
   })
 
-  it('retorna 401 sin token', async () => {
+  it('es accesible sin token (endpoint público)', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     const res = await request(app).get('/api/admin/transfer-config')
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(200)
   })
 })
 
