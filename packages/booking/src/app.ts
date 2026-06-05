@@ -3,6 +3,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import type { NextFunction, Request, Response } from 'express'
 import { requireAuth } from './middleware/auth.js'
+import authRouter from './routes/auth.routes.js'
 import servicesRouter from './routes/services.js'
 import availabilityRouter from './routes/availability.js'
 import appointmentsRouter from './routes/appointments.js'
@@ -24,6 +25,7 @@ app.use(helmet())
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }))
 app.use(express.json())
 
+app.use('/api/auth', authRouter)
 app.use('/api/services', servicesRouter)
 app.use('/api/availability', availabilityRouter)
 app.use('/api/appointments', appointmentsRouter)
