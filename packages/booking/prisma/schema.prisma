@@ -59,6 +59,7 @@ model WeeklySchedule {
   startTime      String
   endTime        String
   serviceIds     String[]
+  isActive       Boolean  @default(true)
 
   professional Professional @relation(fields: [professionalId], references: [id])
 

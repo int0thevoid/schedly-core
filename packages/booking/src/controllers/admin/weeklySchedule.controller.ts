@@ -12,8 +12,9 @@ const createSchema = z.object({
 })
 
 const updateSchema = z.object({
-  startTime: z.string().regex(timeRegex, 'startTime must be HH:MM'),
-  endTime: z.string().regex(timeRegex, 'endTime must be HH:MM'),
+  startTime: z.string().regex(timeRegex, 'startTime must be HH:MM').optional(),
+  endTime: z.string().regex(timeRegex, 'endTime must be HH:MM').optional(),
+  isActive: z.boolean().optional(),
 })
 
 export async function listWeeklySchedules(req: Request, res: Response): Promise<void> {
@@ -55,9 +56,18 @@ export async function updateWeeklySchedule(req: Request, res: Response): Promise
     fail(res, 'Schedule not found', 404)
     return
   }
+  const { startTime, endTime, isActive } = parsed.data
+  if (startTime && endTime && endTime <= startTime) {
+    fail(res, 'endTime must be after startTime', 400)
+    return
+  }
   const schedule = await prisma.weeklySchedule.update({
     where: { id },
-    data: { startTime: parsed.data.startTime, endTime: parsed.data.endTime },
+    data: {
+      ...(startTime !== undefined && { startTime }),
+      ...(endTime !== undefined && { endTime }),
+      ...(isActive !== undefined && { isActive }),
+    },
   })
   ok(res, schedule)
 }

@@ -15,6 +15,7 @@ export interface WeeklySchedule {
   startTime: string    // "09:00" — hora local America/Santiago
   endTime: string      // "19:00" — hora local America/Santiago
   serviceIds?: string[] // undefined = todos los servicios
+  isActive?: boolean   // undefined/true = activo, false = desactivado
 }
 
 export interface ScheduleBlock {

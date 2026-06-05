@@ -99,7 +99,7 @@ export function generateDaySlots(
   bufferMinutes: number = 0,
 ): TimeSlot[] {
   const dow = dayOfWeekInSantiago(date)
-  const schedule = weeklySchedule.find(s => s.dayOfWeek === dow)
+  const schedule = weeklySchedule.find(s => s.dayOfWeek === dow && s.isActive !== false)
   if (!schedule) return []
 
   const start = timeStrToUTC(date, schedule.startTime, TIMEZONE)
