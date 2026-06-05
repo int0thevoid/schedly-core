@@ -9,6 +9,8 @@ import availabilityRouter from './routes/availability.js'
 import appointmentsRouter from './routes/appointments.js'
 import adminAppointmentsRouter from './routes/admin/appointments.js'
 import adminScheduleRouter from './routes/admin/schedule.js'
+import adminServicesRouter from './routes/admin/services.js'
+import adminWeeklyScheduleRouter from './routes/admin/weeklySchedule.js'
 import adminConfigRouter from './routes/admin/config.js'
 import adminTransferRouter from './routes/admin/transfer.js'
 import { fail } from './lib/response.js'
@@ -32,7 +34,9 @@ app.use('/api/appointments', appointmentsRouter)
 
 app.use('/api/admin', requireAuth)
 app.use('/api/admin/appointments', adminAppointmentsRouter)
+app.use('/api/admin/schedule/weekly', adminWeeklyScheduleRouter)
 app.use('/api/admin/schedule', adminScheduleRouter)
+app.use('/api/admin/services', adminServicesRouter)
 app.use('/api/admin/config', adminConfigRouter)
 app.use('/api/admin/transfer-config', adminTransferRouter)
 
