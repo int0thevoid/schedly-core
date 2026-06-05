@@ -8,11 +8,12 @@ datasource db {
 }
 
 model Professional {
-  id    String @id @default(cuid())
-  name  String
-  email String @unique
-  phone String?
-  timezone String @default("America/Santiago")
+  id           String  @id @default(cuid())
+  name         String
+  email        String  @unique
+  phone        String?
+  passwordHash String?
+  timezone     String  @default("America/Santiago")
 
   bookingWindowWeeks     Int @default(4)
   minAdvanceBusinessDays Int @default(2)

@@ -1,6 +1,7 @@
 import { PrismaClient } from '../src/generated/prisma/index.js'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
+import bcrypt from 'bcrypt'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const adapter = new PrismaPg(pool)
@@ -8,6 +9,8 @@ const prisma = new PrismaClient({ adapter })
 
 async function main() {
   console.log('🌱 Seeding Stefany Osorio Alfaro...')
+
+  const passwordHash = await bcrypt.hash('stefany2024', 10)
 
   const transferPlaceholder = {
     transferRut:           'XX.XXX.XXX-X (por confirmar)',
@@ -19,7 +22,7 @@ async function main() {
 
   const professional = await prisma.professional.upsert({
     where: { email: 'stefanyosorioalfaro@gmail.com' },
-    update: transferPlaceholder,
+    update: { ...transferPlaceholder, passwordHash },
     create: {
       name: 'Ps. Stefany Osorio Alfaro',
       email: 'stefanyosorioalfaro@gmail.com',
@@ -28,6 +31,7 @@ async function main() {
       bookingWindowWeeks: 4,
       minAdvanceBusinessDays: 2,
       defaultBufferMinutes: 15,
+      passwordHash,
       ...transferPlaceholder,
     },
   })

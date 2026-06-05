@@ -291,7 +291,7 @@ export function getAvailableSlots(
     const blocks = fourthArg as ScheduleBlock[]
     const appointments = fifthArg as Appointment[]
 
-    const relevant = weeklySchedule.filter(s => !s.serviceIds || s.serviceIds.includes(service.id))
+    const relevant = weeklySchedule.filter(s => !s.serviceIds || s.serviceIds.length === 0 || s.serviceIds.includes(service.id))
     const slots = generateDaySlots(date, relevant, service.duration)
     return filterOccupiedSlots(filterBlockedSlots(slots, blocks), appointments).filter(s => s.isAvailable)
   }
@@ -304,7 +304,7 @@ export function getAvailableSlots(
   const now = (seventhArg ?? (sixthArg instanceof Date ? sixthArg : new Date()))
 
   const buffer = service.bufferMinutes ?? config.defaultBufferMinutes
-  const relevant = weeklySchedule.filter(s => !s.serviceIds || s.serviceIds.includes(service.id))
+  const relevant = weeklySchedule.filter(s => !s.serviceIds || s.serviceIds.length === 0 || s.serviceIds.includes(service.id))
   const slots = generateDaySlots(date, relevant, service.duration, buffer)
 
   const minDT = getMinBookingDateTime(now, config.minAdvanceBusinessDays, config.timezone)

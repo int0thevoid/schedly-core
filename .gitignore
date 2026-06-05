@@ -3,3 +3,5 @@ dist/
 .env
 *.local
 packages/booking/src/generated/
+ecosystem.config.cjs
+ecosystem.config.js
