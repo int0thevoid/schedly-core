@@ -5,6 +5,7 @@ export const prismaMock = {
     findMany: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
   },
   professional: {
     findUnique: vi.fn(),
@@ -12,6 +13,10 @@ export const prismaMock = {
   },
   weeklySchedule: {
     findMany: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
   },
   scheduleBlock: {
     findMany: vi.fn(),
