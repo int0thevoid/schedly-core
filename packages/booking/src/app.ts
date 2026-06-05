@@ -13,6 +13,8 @@ import adminServicesRouter from './routes/admin/services.js'
 import adminWeeklyScheduleRouter from './routes/admin/weeklySchedule.js'
 import adminConfigRouter from './routes/admin/config.js'
 import adminTransferRouter from './routes/admin/transfer.js'
+import adminProfessionalRouter from './routes/admin/professional.js'
+import { getTransferConfig } from './controllers/admin/transfer.controller.js'
 import { fail } from './lib/response.js'
 
 const ALLOWED_ORIGINS = [
@@ -32,6 +34,9 @@ app.use('/api/services', servicesRouter)
 app.use('/api/availability', availabilityRouter)
 app.use('/api/appointments', appointmentsRouter)
 
+// Public: booking wizard needs transfer config without auth
+app.get('/api/admin/transfer-config', getTransferConfig)
+
 app.use('/api/admin', requireAuth)
 app.use('/api/admin/appointments', adminAppointmentsRouter)
 app.use('/api/admin/schedule/weekly', adminWeeklyScheduleRouter)
@@ -39,6 +44,7 @@ app.use('/api/admin/schedule', adminScheduleRouter)
 app.use('/api/admin/services', adminServicesRouter)
 app.use('/api/admin/config', adminConfigRouter)
 app.use('/api/admin/transfer-config', adminTransferRouter)
+app.use('/api/admin/professional', adminProfessionalRouter)
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err)
