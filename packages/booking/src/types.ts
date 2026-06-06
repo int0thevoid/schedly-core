@@ -53,7 +53,8 @@ export interface TimeSlot {
 
 export interface ProfessionalConfig {
   bookingWindowWeeks: number       // default: 4 — cuántas semanas hacia adelante se puede agendar
-  minAdvanceBusinessDays: number   // default: 2 — anticipación mínima en días hábiles (L-V)
+  minAdvanceBusinessDays: number   // default: 2 — anticipación mínima (valor, unidad según minAdvanceUnit)
+  minAdvanceUnit?: 'hours' | 'business_days'  // default: 'business_days'
   defaultBufferMinutes: number     // default: 0 — buffer entre sesiones (global)
   timezone: string                 // default: 'America/Santiago'
 }
