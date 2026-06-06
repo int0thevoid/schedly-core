@@ -11,6 +11,7 @@ const createSchema = z.object({
   clientEmail: z.string().email(),
   clientPhone: z.string().min(1),
   notes: z.string().optional(),
+  saveClientData: z.boolean().optional(),
 })
 
 const cancelSchema = z.object({
@@ -26,7 +27,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
     return
   }
 
-  const { serviceId, startDateTime, modality, clientName, clientEmail, clientPhone, notes } =
+  const { serviceId, startDateTime, modality, clientName, clientEmail, clientPhone, notes, saveClientData } =
     parsed.data
   const professionalId = process.env.PROFESSIONAL_ID ?? ''
 
@@ -50,6 +51,14 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
         },
       })
       if (conflict) throw new Error('SLOT_TAKEN')
+
+      if (saveClientData) {
+        await tx.client.upsert({
+          where: { email: clientEmail },
+          create: { email: clientEmail, name: clientName, phone: clientPhone },
+          update: { name: clientName, phone: clientPhone },
+        })
+      }
 
       return tx.appointment.create({
         data: {

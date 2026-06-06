@@ -20,6 +20,8 @@ model Professional {
   minAdvanceUnit         String @default("business_days")
   defaultBufferMinutes   Int    @default(0)
 
+  patientSearchField String @default("name")
+
   transferRut           String?
   transferBank          String?
   transferAccountType   String?
@@ -117,6 +119,7 @@ model Client {
   email        String  @unique
   name         String
   phone        String?
+  rut          String?
   passwordHash String?
   isVerified   Boolean @default(false)
 

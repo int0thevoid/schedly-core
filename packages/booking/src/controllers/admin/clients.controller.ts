@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 
 const querySchema = z.object({
+  q: z.string().min(1).optional(),
+  field: z.enum(['name', 'email', 'rut', 'phone']).optional(),
   email: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
 })
@@ -14,14 +16,21 @@ export async function listClients(req: Request, res: Response): Promise<void> {
     return
   }
 
-  const { email, name } = parsed.data
+  const { q, field, email, name } = parsed.data
+
+  let where: Record<string, unknown> = {}
+
+  if (q) {
+    const searchField = field ?? 'name'
+    where = { [searchField]: { contains: q, mode: 'insensitive' } }
+  } else {
+    if (email) where = { ...where, email: { contains: email, mode: 'insensitive' } }
+    if (name) where = { ...where, name: { contains: name, mode: 'insensitive' } }
+  }
 
   const clients = await prisma.client.findMany({
-    where: {
-      ...(email ? { email: { contains: email, mode: 'insensitive' } } : {}),
-      ...(name ? { name: { contains: name, mode: 'insensitive' } } : {}),
-    },
-    select: { id: true, name: true, email: true, phone: true },
+    where,
+    select: { id: true, name: true, email: true, phone: true, rut: true },
     orderBy: { name: 'asc' },
     take: 20,
   })

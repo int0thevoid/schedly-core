@@ -9,7 +9,26 @@ const updateSchema = z.object({
   minAdvanceUnit: z.enum(['hours', 'business_days']).optional(),
   defaultBufferMinutes: z.number().int().min(0).max(120).optional(),
   timezone: z.string().min(1).optional(),
+  patientSearchField: z.enum(['name', 'email', 'rut', 'phone']).optional(),
 })
+
+function serializeConfig(p: {
+  bookingWindowWeeks: number
+  minAdvanceBusinessDays: number
+  minAdvanceUnit: string
+  defaultBufferMinutes: number
+  timezone: string
+  patientSearchField?: string
+}) {
+  return {
+    bookingWindowWeeks: p.bookingWindowWeeks,
+    minAdvanceBusinessDays: p.minAdvanceBusinessDays,
+    minAdvanceUnit: p.minAdvanceUnit as 'hours' | 'business_days',
+    defaultBufferMinutes: p.defaultBufferMinutes,
+    timezone: p.timezone,
+    patientSearchField: (p.patientSearchField ?? 'name') as 'name' | 'email' | 'rut' | 'phone',
+  }
+}
 
 export async function getPublicConfig(_req: Request, res: Response): Promise<void> {
   const professionalId = process.env.PROFESSIONAL_ID ?? ''
@@ -18,13 +37,7 @@ export async function getPublicConfig(_req: Request, res: Response): Promise<voi
     fail(res, 'Professional not found', 404)
     return
   }
-  ok(res, {
-    bookingWindowWeeks: professional.bookingWindowWeeks,
-    minAdvanceBusinessDays: professional.minAdvanceBusinessDays,
-    minAdvanceUnit: professional.minAdvanceUnit as 'hours' | 'business_days',
-    defaultBufferMinutes: professional.defaultBufferMinutes,
-    timezone: professional.timezone,
-  })
+  ok(res, serializeConfig(professional))
 }
 
 export async function getConfig(req: Request, res: Response): Promise<void> {
@@ -34,13 +47,7 @@ export async function getConfig(req: Request, res: Response): Promise<void> {
     fail(res, 'Professional not found', 404)
     return
   }
-  ok(res, {
-    bookingWindowWeeks: professional.bookingWindowWeeks,
-    minAdvanceBusinessDays: professional.minAdvanceBusinessDays,
-    minAdvanceUnit: professional.minAdvanceUnit as 'hours' | 'business_days',
-    defaultBufferMinutes: professional.defaultBufferMinutes,
-    timezone: professional.timezone,
-  })
+  ok(res, serializeConfig(professional))
 }
 
 export async function updateConfig(req: Request, res: Response): Promise<void> {
@@ -65,11 +72,5 @@ export async function updateConfig(req: Request, res: Response): Promise<void> {
     where: { id: professionalId },
     data: parsed.data,
   })
-  ok(res, {
-    bookingWindowWeeks: updated.bookingWindowWeeks,
-    minAdvanceBusinessDays: updated.minAdvanceBusinessDays,
-    minAdvanceUnit: updated.minAdvanceUnit as 'hours' | 'business_days',
-    defaultBufferMinutes: updated.defaultBufferMinutes,
-    timezone: updated.timezone,
-  })
+  ok(res, serializeConfig(updated))
 }
