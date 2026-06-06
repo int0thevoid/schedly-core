@@ -37,6 +37,29 @@ export async function createBlock(req: Request, res: Response): Promise<void> {
     return
   }
 
+  const conflicts = await prisma.appointment.findMany({
+    where: {
+      professionalId,
+      status: { not: 'cancelled' },
+      startDateTime: { lt: end },
+      endDateTime: { gt: start },
+    },
+    select: { clientName: true, startDateTime: true, endDateTime: true },
+  })
+
+  if (conflicts.length > 0) {
+    res.status(409).json({
+      success: false,
+      error: 'Hay citas agendadas en este horario',
+      conflicts: conflicts.map((c) => ({
+        clientName: c.clientName,
+        startDateTime: c.startDateTime.toISOString(),
+        endDateTime: c.endDateTime.toISOString(),
+      })),
+    })
+    return
+  }
+
   const block = await prisma.scheduleBlock.create({
     data: {
       professionalId,

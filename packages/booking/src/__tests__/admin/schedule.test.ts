@@ -34,7 +34,8 @@ describe('GET /api/admin/schedule/blocks', () => {
 })
 
 describe('POST /api/admin/schedule/blocks', () => {
-  it('creates a block', async () => {
+  it('creates a block when no conflicting appointments', async () => {
+    prismaMock.appointment.findMany.mockResolvedValue([])
     prismaMock.scheduleBlock.create.mockResolvedValue(BLOCK)
     const res = await request(app)
       .post('/api/admin/schedule/blocks')
@@ -42,6 +43,21 @@ describe('POST /api/admin/schedule/blocks', () => {
       .send({ title: 'Vacaciones', startDateTime: '2026-07-01T00:00:00Z', endDateTime: '2026-07-07T23:59:59Z' })
     expect(res.status).toBe(201)
     expect(res.body.data.title).toBe('Vacaciones')
+  })
+
+  it('returns 409 when conflicting appointment exists', async () => {
+    prismaMock.appointment.findMany.mockResolvedValue([{
+      clientName: 'Ana García',
+      startDateTime: new Date('2026-07-02T10:00:00Z'),
+      endDateTime: new Date('2026-07-02T11:00:00Z'),
+    }])
+    const res = await request(app)
+      .post('/api/admin/schedule/blocks')
+      .set('Authorization', token())
+      .send({ title: 'Bloq', startDateTime: '2026-07-01T00:00:00Z', endDateTime: '2026-07-07T23:59:59Z' })
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('Hay citas agendadas en este horario')
+    expect(res.body.conflicts[0].clientName).toBe('Ana García')
   })
 
   it('returns 400 for missing title', async () => {
