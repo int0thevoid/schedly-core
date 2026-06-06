@@ -67,6 +67,31 @@ describe('POST /api/appointments', () => {
     const res = await request(app).post('/api/appointments').send(VALID_BODY)
     expect(res.status).toBe(404)
   })
+
+  it('upserts client when saveClientData=true', async () => {
+    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    prismaMock.client.upsert.mockResolvedValue({ id: 'c1', name: 'Ana', email: 'ana@test.com', phone: '+56912345678', rut: null })
+    prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+    const res = await request(app).post('/api/appointments').send({ ...VALID_BODY, saveClientData: true })
+    expect(res.status).toBe(201)
+    expect(prismaMock.client.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { email: 'ana@test.com' },
+    }))
+  })
+
+  it('does not upsert client when saveClientData=false', async () => {
+    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+    const res = await request(app).post('/api/appointments').send({ ...VALID_BODY, saveClientData: false })
+    expect(res.status).toBe(201)
+    expect(prismaMock.client.upsert).not.toHaveBeenCalled()
+  })
 })
 
 describe('GET /api/appointments/:id', () => {

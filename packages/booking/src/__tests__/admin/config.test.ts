@@ -15,6 +15,7 @@ const PROFESSIONAL = {
   id: 'pro1', name: 'Stefany', email: 'stefany@test.com', phone: null,
   timezone: 'America/Santiago', bookingWindowWeeks: 4,
   minAdvanceBusinessDays: 2, defaultBufferMinutes: 0,
+  patientSearchField: 'name',
   createdAt: new Date(), updatedAt: new Date(),
 }
 
@@ -24,7 +25,7 @@ beforeEach(() => {
 })
 
 describe('GET /api/admin/config', () => {
-  it('returns professional config', async () => {
+  it('returns professional config including patientSearchField', async () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     const res = await request(app).get('/api/admin/config').set('Authorization', token())
     expect(res.status).toBe(200)
@@ -33,6 +34,7 @@ describe('GET /api/admin/config', () => {
       minAdvanceBusinessDays: 2,
       defaultBufferMinutes: 0,
       timezone: 'America/Santiago',
+      patientSearchField: 'name',
     })
   })
 
@@ -53,6 +55,25 @@ describe('PATCH /api/admin/config', () => {
       .send({ bookingWindowWeeks: 8 })
     expect(res.status).toBe(200)
     expect(res.body.data.bookingWindowWeeks).toBe(8)
+  })
+
+  it('updates patientSearchField', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, patientSearchField: 'email' })
+    const res = await request(app)
+      .patch('/api/admin/config')
+      .set('Authorization', token())
+      .send({ patientSearchField: 'email' })
+    expect(res.status).toBe(200)
+    expect(res.body.data.patientSearchField).toBe('email')
+  })
+
+  it('returns 400 for invalid patientSearchField value', async () => {
+    const res = await request(app)
+      .patch('/api/admin/config')
+      .set('Authorization', token())
+      .send({ patientSearchField: 'invalid' })
+    expect(res.status).toBe(400)
   })
 
   it('returns 400 when no fields provided', async () => {
