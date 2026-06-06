@@ -177,4 +177,124 @@ describe('PATCH /api/admin/appointments/:id/payment', () => {
       .send({ paymentStatus: 'paid' })
     expect(res.status).toBe(400)
   })
+
+  it('saves paymentMethod when provided', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, paymentStatus: 'paid', paymentAmount: 30000, paymentMethod: 'cash' })
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/payment')
+      .set('Authorization', token())
+      .send({ paymentStatus: 'paid', paymentAmount: 30000, paymentMethod: 'cash' })
+    expect(res.status).toBe(200)
+    expect(res.body.data.paymentMethod).toBe('cash')
+  })
+
+  it('reverts to unpaid', async () => {
+    const paid = { ...APT, paymentStatus: 'paid', paymentAmount: 30000, paymentMethod: 'transfer' }
+    prismaMock.appointment.findUnique.mockResolvedValue(paid)
+    prismaMock.appointment.update.mockResolvedValue({ ...paid, paymentStatus: 'unpaid', paymentAmount: null, paymentMethod: null })
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/payment')
+      .set('Authorization', token())
+      .send({ paymentStatus: 'unpaid' })
+    expect(res.status).toBe(200)
+    expect(res.body.data.paymentStatus).toBe('unpaid')
+  })
+})
+
+describe('GET /api/admin/appointments/monthly', () => {
+  it('returns 401 without token', async () => {
+    const res = await request(app).get('/api/admin/appointments/monthly?year=2026&month=6')
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 400 when year or month is missing', async () => {
+    const res = await request(app)
+      .get('/api/admin/appointments/monthly?year=2026')
+      .set('Authorization', token())
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 for invalid year format', async () => {
+    const res = await request(app)
+      .get('/api/admin/appointments/monthly?year=26&month=6')
+      .set('Authorization', token())
+    expect(res.status).toBe(400)
+  })
+
+  it('returns all days of month as keys with empty arrays when no appointments', async () => {
+    prismaMock.appointment.findMany.mockResolvedValue([])
+    const res = await request(app)
+      .get('/api/admin/appointments/monthly?year=2026&month=2')
+      .set('Authorization', token())
+    expect(res.status).toBe(200)
+    expect(Object.keys(res.body.data)).toHaveLength(28)
+    expect(res.body.data['2026-02-01']).toEqual([])
+    expect(res.body.data['2026-02-28']).toEqual([])
+  })
+
+  it('groups appointments by day', async () => {
+    const apt1 = { ...APT, id: 'a1', startDateTime: new Date('2026-06-03T14:00:00Z') }
+    const apt2 = { ...APT, id: 'a2', startDateTime: new Date('2026-06-03T16:00:00Z') }
+    const apt3 = { ...APT, id: 'a3', startDateTime: new Date('2026-06-15T10:00:00Z') }
+    prismaMock.appointment.findMany.mockResolvedValue([apt1, apt2, apt3])
+    const res = await request(app)
+      .get('/api/admin/appointments/monthly?year=2026&month=6')
+      .set('Authorization', token())
+    expect(res.status).toBe(200)
+    expect(res.body.data['2026-06-03']).toHaveLength(2)
+    expect(res.body.data['2026-06-15']).toHaveLength(1)
+    expect(res.body.data['2026-06-01']).toEqual([])
+  })
+
+  it('queries correct month range', async () => {
+    prismaMock.appointment.findMany.mockResolvedValue([])
+    await request(app)
+      .get('/api/admin/appointments/monthly?year=2026&month=6')
+      .set('Authorization', token())
+    const call = prismaMock.appointment.findMany.mock.calls[0][0]
+    expect(call.where.startDateTime.gte).toEqual(new Date('2026-06-01T00:00:00.000Z'))
+    expect(call.where.startDateTime.lte).toEqual(new Date('2026-06-30T23:59:59.999Z'))
+  })
+})
+
+describe('PATCH /api/admin/appointments/:id/attendance', () => {
+  it('marks as attended', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, attended: true })
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/attendance')
+      .set('Authorization', token())
+      .send({ attended: true })
+    expect(res.status).toBe(200)
+    expect(res.body.data.attended).toBe(true)
+  })
+
+  it('marks as not attended', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue({ ...APT, attended: true })
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, attended: false })
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/attendance')
+      .set('Authorization', token())
+      .send({ attended: false })
+    expect(res.status).toBe(200)
+    expect(res.body.data.attended).toBe(false)
+  })
+
+  it('returns 400 for invalid body', async () => {
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/attendance')
+      .set('Authorization', token())
+      .send({ attended: 'yes' })
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 404 when not found', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(null)
+    const res = await request(app)
+      .patch('/api/admin/appointments/bad/attendance')
+      .set('Authorization', token())
+      .send({ attended: true })
+    expect(res.status).toBe(404)
+  })
 })
