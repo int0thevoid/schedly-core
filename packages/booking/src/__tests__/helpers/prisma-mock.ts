@@ -31,6 +31,10 @@ export const prismaMock = {
     create: vi.fn(),
     update: vi.fn(),
   },
+  client: {
+    findMany: vi.fn(),
+    findUnique: vi.fn(),
+  },
   $transaction: vi.fn(),
 }
 

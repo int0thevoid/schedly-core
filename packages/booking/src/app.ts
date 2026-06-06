@@ -14,6 +14,7 @@ import adminWeeklyScheduleRouter from './routes/admin/weeklySchedule.js'
 import adminConfigRouter from './routes/admin/config.js'
 import adminTransferRouter from './routes/admin/transfer.js'
 import adminProfessionalRouter from './routes/admin/professional.js'
+import adminClientsRouter from './routes/admin/clients.js'
 import { getTransferConfig } from './controllers/admin/transfer.controller.js'
 import { fail } from './lib/response.js'
 
@@ -45,6 +46,7 @@ app.use('/api/admin/services', adminServicesRouter)
 app.use('/api/admin/config', adminConfigRouter)
 app.use('/api/admin/transfer-config', adminTransferRouter)
 app.use('/api/admin/professional', adminProfessionalRouter)
+app.use('/api/admin/clients', adminClientsRouter)
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err)
