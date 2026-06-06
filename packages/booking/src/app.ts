@@ -16,6 +16,7 @@ import adminTransferRouter from './routes/admin/transfer.js'
 import adminProfessionalRouter from './routes/admin/professional.js'
 import adminClientsRouter from './routes/admin/clients.js'
 import { getTransferConfig } from './controllers/admin/transfer.controller.js'
+import { getPublicConfig } from './controllers/admin/config.controller.js'
 import { fail } from './lib/response.js'
 
 const ALLOWED_ORIGINS = [
@@ -35,7 +36,8 @@ app.use('/api/services', servicesRouter)
 app.use('/api/availability', availabilityRouter)
 app.use('/api/appointments', appointmentsRouter)
 
-// Public: booking wizard needs transfer config without auth
+// Public: booking wizard needs these without auth
+app.get('/api/config', getPublicConfig)
 app.get('/api/admin/transfer-config', getTransferConfig)
 
 app.use('/api/admin', requireAuth)
