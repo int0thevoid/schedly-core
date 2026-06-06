@@ -15,9 +15,10 @@ model Professional {
   passwordHash String?
   timezone     String  @default("America/Santiago")
 
-  bookingWindowWeeks     Int @default(4)
-  minAdvanceBusinessDays Int @default(2)
-  defaultBufferMinutes   Int @default(0)
+  bookingWindowWeeks     Int    @default(4)
+  minAdvanceBusinessDays Int    @default(2)
+  minAdvanceUnit         String @default("business_days")
+  defaultBufferMinutes   Int    @default(0)
 
   transferRut           String?
   transferBank          String?
@@ -96,8 +97,11 @@ model Appointment {
   modality      String
   status        String   @default("pending")
 
-  paymentStatus String @default("unpaid")
-  paymentAmount Int?
+  paymentStatus  String  @default("unpaid")
+  paymentAmount  Int?
+  paymentMethod  String?
+
+  attended Boolean?
 
   notes String?
 
