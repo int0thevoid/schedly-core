@@ -307,7 +307,9 @@ export function getAvailableSlots(
   const relevant = weeklySchedule.filter(s => !s.serviceIds || s.serviceIds.length === 0 || s.serviceIds.includes(service.id))
   const slots = generateDaySlots(date, relevant, service.duration, buffer)
 
-  const minDT = getMinBookingDateTime(now, config.minAdvanceBusinessDays, config.timezone)
+  const minDT = (config.minAdvanceUnit ?? 'business_days') === 'hours'
+    ? new Date(now.getTime() + config.minAdvanceBusinessDays * 60 * 60 * 1000)
+    : getMinBookingDateTime(now, config.minAdvanceBusinessDays, config.timezone)
   const maxDT = getMaxBookingDateTime(now, config.bookingWindowWeeks, config.timezone)
 
   const inWindow = slots.map(slot =>

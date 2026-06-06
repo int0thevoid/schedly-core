@@ -31,6 +31,7 @@ function toConfig(professional: Professional | null) {
   return {
     bookingWindowWeeks: professional.bookingWindowWeeks,
     minAdvanceBusinessDays: professional.minAdvanceBusinessDays,
+    minAdvanceUnit: professional.minAdvanceUnit as 'hours' | 'business_days',
     defaultBufferMinutes: professional.defaultBufferMinutes,
     timezone: professional.timezone,
   }
@@ -56,6 +57,7 @@ function toWeeklySchedule(s: DbWeeklySchedule): WeeklySchedule {
     startTime: s.startTime,
     endTime: s.endTime,
     serviceIds: s.serviceIds,
+    isActive: s.isActive,
   }
 }
 
