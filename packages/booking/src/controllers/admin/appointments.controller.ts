@@ -3,6 +3,29 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
 
+const TZ = 'America/Santiago'
+
+function todayInTZ(tz: string): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: tz })
+}
+
+function dayRangeInTZ(dateStr: string, tz: string): { gte: Date; lte: Date } {
+  // Use noon as reference to avoid DST edge cases when computing the UTC offset
+  const ref = new Date(`${dateStr}T12:00:00Z`)
+  const localNoon = new Date(
+    ref.toLocaleString('en-US', {
+      timeZone: tz,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }),
+  )
+  const offsetMs = ref.getTime() - localNoon.getTime()
+  return {
+    gte: new Date(new Date(`${dateStr}T00:00:00Z`).getTime() + offsetMs),
+    lte: new Date(new Date(`${dateStr}T23:59:59.999Z`).getTime() + offsetMs),
+  }
+}
+
 const weeklySchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be YYYY-MM-DD'),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'endDate must be YYYY-MM-DD'),
@@ -133,11 +156,9 @@ export async function listAdminAppointments(req: Request, res: Response): Promis
     const weekEnd = new Date(weekStart.getTime() + 7 * 86_400_000)
     where['startDateTime'] = { gte: weekStart, lt: weekEnd }
   } else {
-    const target = date ?? new Date().toISOString().slice(0, 10)
-    where['startDateTime'] = {
-      gte: new Date(`${target}T00:00:00.000Z`),
-      lte: new Date(`${target}T23:59:59.999Z`),
-    }
+    const target = date ?? todayInTZ(TZ)
+    const { gte, lte } = dayRangeInTZ(target, TZ)
+    where['startDateTime'] = { gte, lte }
   }
 
   const appointments = await prisma.appointment.findMany({

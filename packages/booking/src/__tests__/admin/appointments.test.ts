@@ -51,6 +51,19 @@ describe('GET /api/admin/appointments', () => {
     const res = await request(app).get('/api/admin/appointments?status=unknown').set('Authorization', token())
     expect(res.status).toBe(400)
   })
+
+  it('uses America/Santiago timezone when computing today', async () => {
+    // 2026-06-06T03:00:00Z = 2026-06-05T23:00 Santiago (UTC-4) → still June 5 in Santiago
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-06T03:00:00Z'))
+    prismaMock.appointment.findMany.mockResolvedValue([])
+    await request(app).get('/api/admin/appointments').set('Authorization', token())
+
+    const { where } = prismaMock.appointment.findMany.mock.calls[0][0] as { where: { startDateTime: { gte: Date } } }
+    // gte should be start of June 5 in Santiago, not June 6 UTC
+    expect(where.startDateTime.gte.toISOString()).toMatch(/^2026-06-05/)
+    vi.useRealTimers()
+  })
 })
 
 describe('GET /api/admin/appointments/weekly', () => {
