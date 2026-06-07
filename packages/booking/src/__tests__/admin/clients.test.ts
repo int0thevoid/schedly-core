@@ -109,3 +109,34 @@ describe('GET /api/admin/clients', () => {
     expect(res.body.data[0].rut).toBe('12345678-9')
   })
 })
+
+describe('GET /api/admin/clients/:id', () => {
+  it('returns 401 without auth', async () => {
+    const res = await request(app).get('/api/admin/clients/c1')
+    expect(res.status).toBe(401)
+  })
+
+  it('returns the client when it exists', async () => {
+    prismaMock.client.findUnique.mockResolvedValue({ ...CLIENT, createdAt: new Date('2026-01-01T00:00:00Z') })
+    const res = await request(app)
+      .get('/api/admin/clients/c1')
+      .set('Authorization', token())
+    expect(res.status).toBe(200)
+    expect(res.body.data).toMatchObject({
+      id: 'c1',
+      name: 'Ana García',
+      email: 'ana@example.com',
+      phone: '+56912345678',
+      rut: null,
+    })
+    expect(res.body.data.createdAt).toBeDefined()
+  })
+
+  it('returns 404 when the client does not exist', async () => {
+    prismaMock.client.findUnique.mockResolvedValue(null)
+    const res = await request(app)
+      .get('/api/admin/clients/does-not-exist')
+      .set('Authorization', token())
+    expect(res.status).toBe(404)
+  })
+})
