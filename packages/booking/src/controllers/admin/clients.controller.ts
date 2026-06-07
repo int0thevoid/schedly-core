@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
+import { fail, ok } from '../../lib/response.js'
 
 const querySchema = z.object({
   q: z.string().min(1).optional(),
@@ -36,4 +37,20 @@ export async function listClients(req: Request, res: Response): Promise<void> {
   })
 
   res.json({ success: true, data: clients })
+}
+
+export async function getClient(req: Request, res: Response): Promise<void> {
+  const { id } = req.params
+
+  const client = await prisma.client.findUnique({
+    where: { id },
+    select: { id: true, name: true, email: true, phone: true, rut: true, createdAt: true },
+  })
+
+  if (!client) {
+    fail(res, 'Cliente no encontrado', 404)
+    return
+  }
+
+  ok(res, client)
 }
