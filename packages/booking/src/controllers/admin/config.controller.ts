@@ -10,6 +10,7 @@ const updateSchema = z.object({
   defaultBufferMinutes: z.number().int().min(0).max(120).optional(),
   timezone: z.string().min(1).optional(),
   patientSearchField: z.enum(['name', 'email', 'rut', 'phone']).optional(),
+  treatmentTypes: z.array(z.string().min(1)).optional(),
 })
 
 function serializeConfig(p: {
@@ -19,6 +20,7 @@ function serializeConfig(p: {
   defaultBufferMinutes: number
   timezone: string
   patientSearchField?: string
+  treatmentTypes?: string[]
 }) {
   return {
     bookingWindowWeeks: p.bookingWindowWeeks,
@@ -27,6 +29,7 @@ function serializeConfig(p: {
     defaultBufferMinutes: p.defaultBufferMinutes,
     timezone: p.timezone,
     patientSearchField: (p.patientSearchField ?? 'name') as 'name' | 'email' | 'rut' | 'phone',
+    treatmentTypes: p.treatmentTypes ?? [],
   }
 }
 

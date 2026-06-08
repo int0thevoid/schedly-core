@@ -10,6 +10,21 @@ const querySchema = z.object({
   name: z.string().min(1).optional(),
 })
 
+const updateSchema = z.object({
+  treatmentType: z.string().nullable(),
+})
+
+const CLIENT_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  rut: true,
+  treatmentType: true,
+  dataConsentGiven: true,
+  createdAt: true,
+} as const
+
 export async function listClients(req: Request, res: Response): Promise<void> {
   const parsed = querySchema.safeParse(req.query)
   if (!parsed.success) {
@@ -31,7 +46,7 @@ export async function listClients(req: Request, res: Response): Promise<void> {
 
   const clients = await prisma.client.findMany({
     where,
-    select: { id: true, name: true, email: true, phone: true, rut: true },
+    select: CLIENT_SELECT,
     orderBy: { name: 'asc' },
     take: 20,
   })
@@ -44,13 +59,36 @@ export async function getClient(req: Request, res: Response): Promise<void> {
 
   const client = await prisma.client.findUnique({
     where: { id },
-    select: { id: true, name: true, email: true, phone: true, rut: true, createdAt: true },
+    select: CLIENT_SELECT,
   })
 
   if (!client) {
     fail(res, 'Cliente no encontrado', 404)
     return
   }
+
+  ok(res, client)
+}
+
+export async function updateClient(req: Request, res: Response): Promise<void> {
+  const { id } = req.params
+  const parsed = updateSchema.safeParse(req.body)
+  if (!parsed.success) {
+    fail(res, parsed.error.issues[0]?.message ?? 'Cuerpo inválido', 400)
+    return
+  }
+
+  const existing = await prisma.client.findUnique({ where: { id } })
+  if (!existing) {
+    fail(res, 'Cliente no encontrado', 404)
+    return
+  }
+
+  const client = await prisma.client.update({
+    where: { id },
+    data: { treatmentType: parsed.data.treatmentType },
+    select: CLIENT_SELECT,
+  })
 
   ok(res, client)
 }

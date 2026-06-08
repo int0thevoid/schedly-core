@@ -15,6 +15,7 @@ import adminConfigRouter from './routes/admin/config.js'
 import adminTransferRouter from './routes/admin/transfer.js'
 import adminProfessionalRouter from './routes/admin/professional.js'
 import adminClientsRouter from './routes/admin/clients.js'
+import clientsRouter from './routes/clients.js'
 import { getTransferConfig } from './controllers/admin/transfer.controller.js'
 import { getPublicConfig } from './controllers/admin/config.controller.js'
 import { fail } from './lib/response.js'
@@ -35,6 +36,7 @@ app.use('/api/auth', authRouter)
 app.use('/api/services', servicesRouter)
 app.use('/api/availability', availabilityRouter)
 app.use('/api/appointments', appointmentsRouter)
+app.use('/api/clients', clientsRouter)
 
 // Public: booking wizard needs these without auth
 app.get('/api/config', getPublicConfig)

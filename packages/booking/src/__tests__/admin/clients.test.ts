@@ -17,6 +17,8 @@ const CLIENT = {
   email: 'ana@example.com',
   phone: '+56912345678',
   rut: null,
+  treatmentType: null,
+  dataConsentGiven: false,
 }
 
 beforeEach(() => {
@@ -138,5 +140,72 @@ describe('GET /api/admin/clients/:id', () => {
       .get('/api/admin/clients/does-not-exist')
       .set('Authorization', token())
     expect(res.status).toBe(404)
+  })
+
+  it('includes treatmentType and dataConsentGiven in response', async () => {
+    prismaMock.client.findUnique.mockResolvedValue({
+      ...CLIENT,
+      treatmentType: 'Ansiedad',
+      dataConsentGiven: true,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    })
+    const res = await request(app)
+      .get('/api/admin/clients/c1')
+      .set('Authorization', token())
+    expect(res.status).toBe(200)
+    expect(res.body.data.treatmentType).toBe('Ansiedad')
+    expect(res.body.data.dataConsentGiven).toBe(true)
+  })
+})
+
+describe('PATCH /api/admin/clients/:id', () => {
+  it('returns 401 without auth', async () => {
+    const res = await request(app).patch('/api/admin/clients/c1').send({ treatmentType: 'Ansiedad' })
+    expect(res.status).toBe(401)
+  })
+
+  it('updates treatmentType and returns the updated client', async () => {
+    prismaMock.client.findUnique.mockResolvedValue(CLIENT)
+    prismaMock.client.update.mockResolvedValue({ ...CLIENT, treatmentType: 'Ansiedad' })
+    const res = await request(app)
+      .patch('/api/admin/clients/c1')
+      .set('Authorization', token())
+      .send({ treatmentType: 'Ansiedad' })
+    expect(res.status).toBe(200)
+    expect(res.body.data.treatmentType).toBe('Ansiedad')
+    expect(prismaMock.client.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'c1' },
+        data: { treatmentType: 'Ansiedad' },
+      }),
+    )
+  })
+
+  it('allows clearing treatmentType with null', async () => {
+    prismaMock.client.findUnique.mockResolvedValue({ ...CLIENT, treatmentType: 'Ansiedad' })
+    prismaMock.client.update.mockResolvedValue({ ...CLIENT, treatmentType: null })
+    const res = await request(app)
+      .patch('/api/admin/clients/c1')
+      .set('Authorization', token())
+      .send({ treatmentType: null })
+    expect(res.status).toBe(200)
+    expect(res.body.data.treatmentType).toBeNull()
+  })
+
+  it('returns 404 when the client does not exist', async () => {
+    prismaMock.client.findUnique.mockResolvedValue(null)
+    const res = await request(app)
+      .patch('/api/admin/clients/does-not-exist')
+      .set('Authorization', token())
+      .send({ treatmentType: 'Ansiedad' })
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 400 when treatmentType is missing from body', async () => {
+    const res = await request(app)
+      .patch('/api/admin/clients/c1')
+      .set('Authorization', token())
+      .send({})
+    expect(res.status).toBe(400)
   })
 })

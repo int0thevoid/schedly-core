@@ -16,6 +16,7 @@ const PROFESSIONAL = {
   timezone: 'America/Santiago', bookingWindowWeeks: 4,
   minAdvanceBusinessDays: 2, defaultBufferMinutes: 0,
   patientSearchField: 'name',
+  treatmentTypes: ['Ansiedad', 'Terapia de pareja'],
   createdAt: new Date(), updatedAt: new Date(),
 }
 
@@ -36,6 +37,20 @@ describe('GET /api/admin/config', () => {
       timezone: 'America/Santiago',
       patientSearchField: 'name',
     })
+  })
+
+  it('returns treatmentTypes', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    const res = await request(app).get('/api/admin/config').set('Authorization', token())
+    expect(res.status).toBe(200)
+    expect(res.body.data.treatmentTypes).toEqual(['Ansiedad', 'Terapia de pareja'])
+  })
+
+  it('returns an empty array when treatmentTypes is not set', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, treatmentTypes: undefined })
+    const res = await request(app).get('/api/admin/config').set('Authorization', token())
+    expect(res.status).toBe(200)
+    expect(res.body.data.treatmentTypes).toEqual([])
   })
 
   it('returns 404 when professional not found', async () => {
@@ -73,6 +88,28 @@ describe('PATCH /api/admin/config', () => {
       .patch('/api/admin/config')
       .set('Authorization', token())
       .send({ patientSearchField: 'invalid' })
+    expect(res.status).toBe(400)
+  })
+
+  it('updates treatmentTypes', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, treatmentTypes: ['TCA'] })
+    const res = await request(app)
+      .patch('/api/admin/config')
+      .set('Authorization', token())
+      .send({ treatmentTypes: ['TCA'] })
+    expect(res.status).toBe(200)
+    expect(res.body.data.treatmentTypes).toEqual(['TCA'])
+    expect(prismaMock.professional.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { treatmentTypes: ['TCA'] } }),
+    )
+  })
+
+  it('returns 400 when treatmentTypes contains an empty string', async () => {
+    const res = await request(app)
+      .patch('/api/admin/config')
+      .set('Authorization', token())
+      .send({ treatmentTypes: ['Ansiedad', ''] })
     expect(res.status).toBe(400)
   })
 
