@@ -55,8 +55,8 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
       if (saveClientData) {
         await tx.client.upsert({
           where: { email: clientEmail },
-          create: { email: clientEmail, name: clientName, phone: clientPhone },
-          update: { name: clientName, phone: clientPhone },
+          create: { email: clientEmail, name: clientName, phone: clientPhone, dataConsentGiven: true },
+          update: { name: clientName, phone: clientPhone, dataConsentGiven: true },
         })
       }
 

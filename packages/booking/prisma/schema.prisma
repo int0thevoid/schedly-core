@@ -20,7 +20,8 @@ model Professional {
   minAdvanceUnit         String @default("business_days")
   defaultBufferMinutes   Int    @default(0)
 
-  patientSearchField String @default("name")
+  patientSearchField String   @default("name")
+  treatmentTypes     String[] @default([])
 
   transferRut           String?
   transferBank          String?
@@ -115,13 +116,15 @@ model Appointment {
 }
 
 model Client {
-  id           String  @id @default(cuid())
-  email        String  @unique
-  name         String
-  phone        String?
-  rut          String?
-  passwordHash String?
-  isVerified   Boolean @default(false)
+  id               String  @id @default(cuid())
+  email            String  @unique
+  name             String
+  phone            String?
+  rut              String?
+  passwordHash     String?
+  isVerified       Boolean @default(false)
+  treatmentType    String?
+  dataConsentGiven Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
