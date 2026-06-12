@@ -108,6 +108,10 @@ model Appointment {
 
   notes String?
 
+  reminderSentAt        DateTime?
+  reminder2hSentAt      DateTime?
+  paymentReminderSentAt DateTime?
+
   professional Professional @relation(fields: [professionalId], references: [id])
   service      Service      @relation(fields: [serviceId], references: [id])
 

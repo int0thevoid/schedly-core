@@ -31,6 +31,9 @@ jobs:
       - name: Test @schedly/ui
         run: cd packages/ui && pnpm test
 
+      - name: Test @schedly/notifications
+        run: cd packages/notifications && pnpm test
+
       - name: Generate Prisma Client
         run: cd packages/booking && npx prisma generate
 
