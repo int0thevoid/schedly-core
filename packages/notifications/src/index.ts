@@ -1,8 +1,6 @@
-// @schedly/notifications — Sistema de notificaciones
-// Features planificadas:
-// - Email (Resend)
-// - WhatsApp (Evolution API → WhatsApp Business API)
-// - Templates personalizables con tags dinámicos
-// - Recordatorios configurables (24h/48h antes)
-// - Integración Google Calendar
-export {}
+export { EmailService } from './email.service.js'
+export { getAppointmentsNeedingReminder, type AppointmentForReminder, type AppointmentsNeedingReminder } from './scheduler.js'
+export * from './templates/appointment-confirmation.js'
+export * from './templates/appointment-reminder.js'
+export * from './templates/payment-reminder.js'
+export * from './templates/review-request.js'

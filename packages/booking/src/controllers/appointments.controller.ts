@@ -1,7 +1,18 @@
 import type { Request, Response } from 'express'
 import { z } from 'zod'
+import { EmailService } from '@schedly/notifications'
 import { prisma } from '../lib/prisma.js'
 import { fail, ok } from '../lib/response.js'
+import { buildAppointmentConfirmationData } from '../lib/notification-data.js'
+import type { Appointment, Service } from '../generated/prisma/index.js'
+
+let emailService: EmailService | undefined
+
+/** Instancia el EmailService de forma perezosa para no fallar al cargar el módulo si RESEND_API_KEY no está configurada. */
+function getEmailService(): EmailService {
+  emailService ??= new EmailService()
+  return emailService
+}
 
 const createSchema = z.object({
   serviceId: z.string().min(1),
@@ -77,12 +88,27 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
       })
     })
     ok(res, appointment, 201)
+
+    void sendConfirmationEmail(appointment, service)
   } catch (err) {
     if (err instanceof Error && err.message === 'SLOT_TAKEN') {
       fail(res, 'Slot is no longer available', 409)
       return
     }
     throw err
+  }
+}
+
+/** Envía la confirmación por correo al cliente. Best-effort: un fallo se registra pero no afecta la cita ya creada. */
+async function sendConfirmationEmail(appointment: Appointment, service: Service): Promise<void> {
+  try {
+    const professional = await prisma.professional.findUnique({ where: { id: appointment.professionalId } })
+    if (!professional) return
+
+    const data = buildAppointmentConfirmationData({ ...appointment, service }, professional)
+    await getEmailService().sendAppointmentConfirmation(appointment.clientEmail, data)
+  } catch (err) {
+    console.error(`[notifications] failed to send confirmation email for appointment ${appointment.id}`, err)
   }
 }
 
