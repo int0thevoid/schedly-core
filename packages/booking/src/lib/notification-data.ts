@@ -5,6 +5,7 @@ import type {
   TransferData,
 } from '@schedly/notifications'
 import type { Appointment, Professional, Service } from '../generated/prisma/index.js'
+import { getBankName } from '../data/banks.js'
 
 export type AppointmentWithService = Appointment & { service: Service }
 
@@ -33,7 +34,7 @@ export function buildTransferData(professional: Professional): TransferData | un
   }
   return {
     rut: transferRut,
-    bank: transferBank,
+    bank: getBankName(transferBank),
     accountType: transferAccountType,
     accountNumber: transferAccountNumber,
     email: transferEmail,
