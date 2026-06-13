@@ -88,9 +88,11 @@ const startOfDayInSantiago = (date: Date) => startOfDayInZone(date, TIMEZONE)
 /**
  * Genera los slots del día según el horario semanal.
  *
- * Los slots se separan por `serviceDuration + bufferMinutes` minutos (intervalo),
- * pero cada slot dura sólo `serviceDuration` minutos. Si `bufferMinutes` es 0
- * (por defecto), el comportamiento es idéntico al original.
+ * Los slots siempre comienzan en horas cerradas: el primero coincide con
+ * `schedule.startTime` y cada siguiente avanza exactamente 60 minutos,
+ * sin importar la duración del servicio ni el buffer. Cada slot dura
+ * `serviceDuration` minutos; un slot es válido sólo si
+ * `startTime + serviceDuration + bufferMinutes <= schedule.endTime`.
  */
 export function generateDaySlots(
   date: Date,
@@ -105,18 +107,19 @@ export function generateDaySlots(
   const start = timeStrToUTC(date, schedule.startTime, TIMEZONE)
   const end = timeStrToUTC(date, schedule.endTime, TIMEZONE)
   const durationMs = serviceDuration * 60 * 1000
-  const intervalMs = (serviceDuration + bufferMinutes) * 60 * 1000
+  const occupiedMs = (serviceDuration + bufferMinutes) * 60 * 1000
+  const HOUR_MS = 60 * 60 * 1000
 
   const slots: TimeSlot[] = []
   let cursor = start.getTime()
 
-  while (cursor + durationMs <= end.getTime()) {
+  while (cursor + occupiedMs <= end.getTime()) {
     slots.push({
       startDateTime: new Date(cursor),
       endDateTime: new Date(cursor + durationMs),
       isAvailable: true,
     })
-    cursor += intervalMs
+    cursor += HOUR_MS
   }
 
   return slots

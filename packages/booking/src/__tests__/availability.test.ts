@@ -150,10 +150,10 @@ describe('generateDaySlots', () => {
     expect(slots).toHaveLength(0)
   })
 
-  it('genera 13 slots de 45 min en horario 09:00-19:00 (verano)', () => {
-    // (19:00 - 09:00) = 600 min / 45 min = 13 slots completos
+  it('genera 10 slots de 45 min en horario 09:00-19:00, en horas cerradas (verano)', () => {
+    // Slots cada 60 min desde 09:00 hasta 18:00 (18:00 + 45min <= 19:00)
     const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45)
-    expect(slots).toHaveLength(13)
+    expect(slots).toHaveLength(10)
   })
 
   it('el primer slot comienza a las 09:00 Santiago', () => {
@@ -162,10 +162,18 @@ describe('generateDaySlots', () => {
     expect(toSantiagoHHMM(slots[0].endDateTime)).toBe('09:45')
   })
 
-  it('el segundo slot es 09:45, el tercero 10:30', () => {
+  it('el segundo slot es 10:00, el tercero 11:00 (incrementos de 60 min)', () => {
     const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45)
-    expect(toSantiagoHHMM(slots[1].startDateTime)).toBe('09:45')
-    expect(toSantiagoHHMM(slots[2].startDateTime)).toBe('10:30')
+    expect(toSantiagoHHMM(slots[1].startDateTime)).toBe('10:00')
+    expect(toSantiagoHHMM(slots[2].startDateTime)).toBe('11:00')
+  })
+
+  it('todos los slots comienzan en una hora cerrada (minuto = 00), sin importar la duración', () => {
+    const slots45 = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45)
+    const slots50buffer15 = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 50, 15)
+    ;[...slots45, ...slots50buffer15].forEach(slot => {
+      expect(toSantiagoHHMM(slot.startDateTime).endsWith(':00')).toBe(true)
+    })
   })
 
   it('el último slot comienza a las 18:00 y termina a las 18:45', () => {
@@ -184,7 +192,7 @@ describe('generateDaySlots', () => {
 
   it('genera slots correctos en invierno (UTC-4)', () => {
     const slots = generateDaySlots(MONDAY_JUL_15, SCHEDULE_MON_FRI, 45)
-    expect(slots).toHaveLength(13)
+    expect(slots).toHaveLength(10)
     expect(toSantiagoHHMM(slots[0].startDateTime)).toBe('09:00')
     expect(toSantiagoDate(slots[0].startDateTime)).toBe('2024-07-15')
   })
@@ -292,7 +300,7 @@ describe('filterBlockedSlots', () => {
 
   it('bloqueo puntual parcial bloquea sólo los slots solapados', () => {
     const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45)
-    // Bloqueo 11:00-13:00 Santiago (cubre slots 11:15 y 12:00)
+    // Bloqueo 11:00-13:00 Santiago (cubre los slots 11:00-11:45 y 12:00-12:45)
     const block = makeBlock(
       makeSantiagoDate('2024-01-15', '11:00').toISOString(),
       makeSantiagoDate('2024-01-15', '13:00').toISOString(),
@@ -300,14 +308,16 @@ describe('filterBlockedSlots', () => {
     const result = filterBlockedSlots(slots, [block])
 
     const blockedTimes = result.filter(s => !s.isAvailable).map(s => toSantiagoHHMM(s.startDateTime))
-    // Los slots 10:30-11:15 y 11:15-12:00 y 12:00-12:45 se solapan con 11:00-13:00
-    expect(blockedTimes).toContain('10:30')
-    expect(blockedTimes).toContain('11:15')
+    expect(blockedTimes).toContain('11:00')
     expect(blockedTimes).toContain('12:00')
 
     // El slot 09:00 no se solapa
     const slot900 = result.find(s => toSantiagoHHMM(s.startDateTime) === '09:00')
     expect(slot900?.isAvailable).toBe(true)
+
+    // El slot 13:00 tampoco (el bloqueo termina justo cuando empieza)
+    const slot1300 = result.find(s => toSantiagoHHMM(s.startDateTime) === '13:00')
+    expect(slot1300?.isAvailable).toBe(true)
   })
 
   it('bloqueo recurrente diario bloquea el mismo horario todos los días', () => {
@@ -324,12 +334,12 @@ describe('filterBlockedSlots', () => {
     const monResult = filterBlockedSlots(monday, [block])
     const tueResult = filterBlockedSlots(tuesday, [block])
 
-    // En ambos días, el slot 09:45-10:30 queda bloqueado (solapa con 10:00-11:00)
+    // En ambos días, el slot 10:00-10:45 queda bloqueado (solapa con 10:00-11:00)
     const monBlocked = monResult.filter(s => !s.isAvailable).map(s => toSantiagoHHMM(s.startDateTime))
     const tueBlocked = tueResult.filter(s => !s.isAvailable).map(s => toSantiagoHHMM(s.startDateTime))
 
-    expect(monBlocked).toContain('09:45')
-    expect(tueBlocked).toContain('09:45')
+    expect(monBlocked).toContain('10:00')
+    expect(tueBlocked).toContain('10:00')
   })
 
   it('bloqueo recurrente semanal (mismo día) afecta sólo ese día de la semana', () => {
@@ -402,10 +412,10 @@ describe('filterOccupiedSlots', () => {
 
     const result = filterOccupiedSlots(slots, [appointment])
     const slot900 = result.find(s => toSantiagoHHMM(s.startDateTime) === '09:00')
-    const slot945 = result.find(s => toSantiagoHHMM(s.startDateTime) === '09:45')
+    const slot1000 = result.find(s => toSantiagoHHMM(s.startDateTime) === '10:00')
 
     expect(slot900?.isAvailable).toBe(false)
-    expect(slot945?.isAvailable).toBe(true)  // el siguiente slot está libre
+    expect(slot1000?.isAvailable).toBe(true)  // el siguiente slot está libre
   })
 
   it('cita cancelada no bloquea el slot', () => {
@@ -421,19 +431,19 @@ describe('filterOccupiedSlots', () => {
 
   it('cita que solapa parcialmente bloquea los slots afectados', () => {
     const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45)
-    // Cita de 09:30 a 10:30 — solapa con slot 09:00-09:45 y slot 09:45-10:30
+    // Cita de 09:30 a 10:30 — solapa con slot 09:00-09:45 y slot 10:00-10:45
     const aptStart = makeSantiagoDate('2024-01-15', '09:30')
     const aptEnd = makeSantiagoDate('2024-01-15', '10:30')
     const appointment = makeAppointment(aptStart, aptEnd)
 
     const result = filterOccupiedSlots(slots, [appointment])
     const s900 = result.find(s => toSantiagoHHMM(s.startDateTime) === '09:00')
-    const s945 = result.find(s => toSantiagoHHMM(s.startDateTime) === '09:45')
-    const s1030 = result.find(s => toSantiagoHHMM(s.startDateTime) === '10:30')
+    const s1000 = result.find(s => toSantiagoHHMM(s.startDateTime) === '10:00')
+    const s1100 = result.find(s => toSantiagoHHMM(s.startDateTime) === '11:00')
 
     expect(s900?.isAvailable).toBe(false)
-    expect(s945?.isAvailable).toBe(false)
-    expect(s1030?.isAvailable).toBe(true)
+    expect(s1000?.isAvailable).toBe(false)
+    expect(s1100?.isAvailable).toBe(true)
   })
 
   it('múltiples citas bloquean sus respectivos slots', () => {
@@ -450,8 +460,8 @@ describe('filterOccupiedSlots', () => {
     const result = filterOccupiedSlots(slots, [apt1, apt2])
     const blocked = result.filter(s => !s.isAvailable).map(s => toSantiagoHHMM(s.startDateTime))
     expect(blocked).toContain('09:00')
-    expect(blocked).toContain('11:15')
-    expect(blocked).not.toContain('09:45')
+    expect(blocked).toContain('11:00')
+    expect(blocked).not.toContain('10:00')
   })
 })
 
@@ -460,7 +470,7 @@ describe('filterOccupiedSlots', () => {
 describe('getAvailableSlots', () => {
   it('retorna todos los slots disponibles cuando no hay bloques ni citas', () => {
     const available = getAvailableSlots(MONDAY_JAN_15, SERVICE_45, SCHEDULE_MON_FRI, [], [])
-    expect(available).toHaveLength(13)
+    expect(available).toHaveLength(10)
     expect(available.every(s => s.isAvailable)).toBe(true)
   })
 
@@ -483,8 +493,8 @@ describe('getAvailableSlots', () => {
     const times = available.map(s => toSantiagoHHMM(s.startDateTime))
 
     expect(times).not.toContain('09:00') // bloqueado
-    expect(times).not.toContain('09:45') // ocupado por cita
-    expect(times).toContain('10:30')     // libre
+    expect(times).not.toContain('10:00') // ocupado por cita
+    expect(times).toContain('11:00')     // libre
   })
 
   it('filtra el horario según serviceIds del WeeklySchedule', () => {
@@ -613,11 +623,11 @@ describe('getMaxBookingDateTime', () => {
 // ─── generateDaySlots con buffer ────────────────────────────────────────────
 
 describe('generateDaySlots con bufferMinutes', () => {
-  it('buffer=0 → comportamiento idéntico al original (13 slots de 45 min)', () => {
+  it('buffer=0 → slots cada 60 min, en horas cerradas (10 slots de 45 min)', () => {
     const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45, 0)
-    expect(slots).toHaveLength(13)
+    expect(slots).toHaveLength(10)
     expect(toSantiagoHHMM(slots[0].startDateTime)).toBe('09:00')
-    expect(toSantiagoHHMM(slots[1].startDateTime)).toBe('09:45')
+    expect(toSantiagoHHMM(slots[1].startDateTime)).toBe('10:00')
   })
 
   it('sesión 45min + buffer 15min → siguiente slot a los 60min', () => {
@@ -642,13 +652,14 @@ describe('generateDaySlots con bufferMinutes', () => {
     })
   })
 
-  it('sesión 60min + buffer 30min → 7 slots en 09:00-19:00', () => {
-    // Intervalo 90 min. Slots: 09:00, 10:30, 12:00, 13:30, 15:00, 16:30, 18:00
-    // El último slot (18:00-19:00) cabe porque 18:00+60min = 19:00 = endTime
+  it('sesión 60min + buffer 30min → 9 slots en 09:00-19:00 (incrementos de 60 min)', () => {
+    // Cada slot avanza 60 min; válido si start + 60 + 30 <= 19:00 → start <= 17:00
+    // Slots: 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00, 17:00
     const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 60, 30)
-    expect(slots).toHaveLength(7)
+    expect(slots).toHaveLength(9)
     expect(toSantiagoHHMM(slots[0].startDateTime)).toBe('09:00')
-    expect(toSantiagoHHMM(slots[1].startDateTime)).toBe('10:30')
+    expect(toSantiagoHHMM(slots[1].startDateTime)).toBe('10:00')
+    expect(toSantiagoHHMM(slots[slots.length - 1].startDateTime)).toBe('17:00')
   })
 })
 
@@ -679,10 +690,10 @@ describe('getAvailableSlots con ProfessionalConfig', () => {
     expect(slots).toHaveLength(10)
   })
 
-  it('sin buffer (defaultBufferMinutes=0) → 13 slots de 45 min', () => {
+  it('sin buffer (defaultBufferMinutes=0) → 10 slots de 45 min en horas cerradas', () => {
     const wednesday = new Date('2024-01-17T12:00:00Z')
     const slots = getAvailableSlots(wednesday, SERVICE_45, DEFAULT_CONFIG, SCHEDULE_MON_FRI, [], [], NOW)
-    expect(slots).toHaveLength(13)
+    expect(slots).toHaveLength(10)
   })
 
   it('slot antes del mínimo → no disponible (día completo bloqueado por ventana)', () => {
@@ -741,8 +752,8 @@ describe('getAvailableSlots con ProfessionalConfig', () => {
     const times = slots.map(s => toSantiagoHHMM(s.startDateTime))
 
     expect(times).not.toContain('09:00') // bloqueado
-    expect(times).not.toContain('09:45') // ocupado por cita
-    expect(times).toContain('10:30')     // libre y dentro del rango
+    expect(times).not.toContain('10:00') // ocupado por cita
+    expect(times).toContain('11:00')     // libre y dentro del rango
   })
 
   it('sin now explícito usa new Date() internamente (smoke test)', () => {

@@ -23,3 +23,8 @@ export const ACCOUNT_TYPES = [
 
 export type BankCode        = typeof CHILEAN_BANKS[number]['code']
 export type AccountTypeCode = typeof ACCOUNT_TYPES[number]['code']
+
+/** Convierte un código de banco (ej. "banco_chile") a su nombre legible (ej. "Banco de Chile"). Si el código no se reconoce, lo retorna sin cambios. */
+export function getBankName(code: string): string {
+  return CHILEAN_BANKS.find(b => b.code === code)?.name ?? code
+}

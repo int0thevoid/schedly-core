@@ -62,13 +62,13 @@ export function renderLayout({ professionalName, bodyHtml, footerHtml }: LayoutO
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   </head>
-  <body style="margin:0;padding:0;background-color:${COLORS.background};font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:${COLORS.text};">
-    <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
+  <body style="margin:0;padding:0;background-color:${COLORS.background};font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:${COLORS.text};word-wrap:break-word;overflow-wrap:break-word;max-width:100%;">
+    <div style="max-width:600px;margin:0 auto;padding:24px 16px;word-wrap:break-word;overflow-wrap:break-word;">
       ${headerHtml}
-      <div style="background-color:#ffffff;border:1px solid ${COLORS.border};border-radius:12px;padding:32px;">
+      <div style="background-color:#ffffff;border:1px solid ${COLORS.border};border-radius:12px;padding:32px;word-wrap:break-word;overflow-wrap:break-word;max-width:100%;">
         ${bodyHtml}
       </div>
-      ${footerHtml ? `<div style="text-align:center;padding:24px 16px 8px;color:${COLORS.muted};font-size:13px;line-height:1.6;">${footerHtml}</div>` : ''}
+      ${footerHtml ? `<div style="text-align:center;padding:24px 16px 8px;color:${COLORS.muted};font-size:13px;line-height:1.6;word-wrap:break-word;overflow-wrap:break-word;max-width:100%;">${footerHtml}</div>` : ''}
     </div>
   </body>
 </html>`

@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 import { z } from 'zod'
-import { ACCOUNT_TYPES, CHILEAN_BANKS } from '../../data/banks.js'
+import { ACCOUNT_TYPES, CHILEAN_BANKS, getBankName } from '../../data/banks.js'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
 
@@ -25,6 +25,7 @@ export async function getTransferConfig(req: Request, res: Response): Promise<vo
   ok(res, {
     transferRut:           professional.transferRut,
     transferBank:          professional.transferBank,
+    bankName:              professional.transferBank ? getBankName(professional.transferBank) : null,
     transferAccountType:   professional.transferAccountType,
     transferAccountNumber: professional.transferAccountNumber,
     transferEmail:         professional.transferEmail,
@@ -58,6 +59,7 @@ export async function updateTransferConfig(req: Request, res: Response): Promise
   ok(res, {
     transferRut:           updated.transferRut,
     transferBank:          updated.transferBank,
+    bankName:              updated.transferBank ? getBankName(updated.transferBank) : null,
     transferAccountType:   updated.transferAccountType,
     transferAccountNumber: updated.transferAccountNumber,
     transferEmail:         updated.transferEmail,

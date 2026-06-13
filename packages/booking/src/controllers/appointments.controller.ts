@@ -23,6 +23,7 @@ const createSchema = z.object({
   clientPhone: z.string().min(1),
   notes: z.string().optional(),
   saveClientData: z.boolean().optional(),
+  rut: z.string().optional(),
 })
 
 const cancelSchema = z.object({
@@ -38,7 +39,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
     return
   }
 
-  const { serviceId, startDateTime, modality, clientName, clientEmail, clientPhone, notes, saveClientData } =
+  const { serviceId, startDateTime, modality, clientName, clientEmail, clientPhone, notes, saveClientData, rut } =
     parsed.data
   const professionalId = process.env.PROFESSIONAL_ID ?? ''
 
@@ -66,8 +67,8 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
       if (saveClientData) {
         await tx.client.upsert({
           where: { email: clientEmail },
-          create: { email: clientEmail, name: clientName, phone: clientPhone, dataConsentGiven: true },
-          update: { name: clientName, phone: clientPhone, dataConsentGiven: true },
+          create: { email: clientEmail, name: clientName, phone: clientPhone, rut, dataConsentGiven: true },
+          update: { name: clientName, phone: clientPhone, rut, dataConsentGiven: true },
         })
       }
 
