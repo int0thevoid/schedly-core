@@ -3,6 +3,8 @@ import { appointmentConfirmationTemplate, type AppointmentConfirmationData } fro
 import { appointmentReminderTemplate, type AppointmentReminderData } from './templates/appointment-reminder.js'
 import { paymentReminderTemplate, type PaymentReminderData } from './templates/payment-reminder.js'
 import { reviewRequestTemplate, type ReviewRequestData } from './templates/review-request.js'
+import { dailyDigestTemplate, type DailyDigestData } from './templates/daily-digest.js'
+import { appointmentCancelledTemplate, type AppointmentCancelledData } from './templates/appointment-cancelled.js'
 
 export class EmailService {
   private resend: Resend
@@ -30,6 +32,16 @@ export class EmailService {
 
   async sendReviewRequest(to: string, data: ReviewRequestData): Promise<void> {
     const { subject, html } = reviewRequestTemplate(data)
+    await this.send(to, subject, html)
+  }
+
+  async sendDailyDigest(to: string, data: DailyDigestData): Promise<void> {
+    const { subject, html } = dailyDigestTemplate(data)
+    await this.send(to, subject, html)
+  }
+
+  async sendAppointmentCancelled(to: string, data: AppointmentCancelledData): Promise<void> {
+    const { subject, html } = appointmentCancelledTemplate(data)
     await this.send(to, subject, html)
   }
 

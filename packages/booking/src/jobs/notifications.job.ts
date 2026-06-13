@@ -1,8 +1,17 @@
 import { EmailService, getAppointmentsNeedingReminder, type AppointmentForReminder } from '@schedly/notifications'
 import { prisma } from '../lib/prisma.js'
-import { buildAppointmentReminderData, buildPaymentReminderData, type AppointmentWithService } from '../lib/notification-data.js'
+import {
+  buildAppointmentReminderData,
+  buildDailyDigestData,
+  buildPaymentReminderData,
+  formatAppointmentDate,
+  type AppointmentWithService,
+} from '../lib/notification-data.js'
+import { addDaysToDateStr, dayRangeInTZ, nowMinutesInTZ, timeStrToMinutes, todayInTZ } from '../lib/date.js'
+import type { Professional } from '../generated/prisma/index.js'
 
 const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000
+const DIGEST_WINDOW_MINUTES = 15
 
 /**
  * Revisa las citas pendientes/confirmadas de las próximas 48h y envía los
@@ -80,5 +89,45 @@ export async function runNotificationsJob(): Promise<void> {
     } catch (err) {
       console.error(`[notifications] failed to send payment reminder for appointment ${id}`, err)
     }
+  }
+
+  await sendDailyDigestIfNeeded(professional, emailService)
+}
+
+/**
+ * Si la hora actual (en la zona horaria del profesional) cae dentro de la
+ * ventana de `dailyDigestTime` y el resumen no se ha enviado hoy, envía al
+ * profesional las citas del día siguiente y marca `lastDailyDigestSentDate`.
+ */
+export async function sendDailyDigestIfNeeded(professional: Professional, emailService: EmailService): Promise<void> {
+  const tz = professional.timezone
+  const today = todayInTZ(tz)
+  if (professional.lastDailyDigestSentDate === today) return
+
+  const windowStart = timeStrToMinutes(professional.dailyDigestTime)
+  const currentMinutes = nowMinutesInTZ(tz)
+  if (currentMinutes < windowStart || currentMinutes >= windowStart + DIGEST_WINDOW_MINUTES) return
+
+  const tomorrow = addDaysToDateStr(today, 1)
+  const { gte, lte } = dayRangeInTZ(tomorrow, tz)
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      professionalId: professional.id,
+      status: { not: 'cancelled' },
+      startDateTime: { gte, lte },
+    },
+    include: { service: true },
+    orderBy: { startDateTime: 'asc' },
+  })
+
+  const date = formatAppointmentDate(new Date(`${tomorrow}T12:00:00Z`), tz)
+  const data = buildDailyDigestData(appointments as AppointmentWithService[], professional, date)
+
+  try {
+    await emailService.sendDailyDigest(professional.email, data)
+    await prisma.professional.update({ where: { id: professional.id }, data: { lastDailyDigestSentDate: today } })
+  } catch (err) {
+    console.error(`[notifications] failed to send daily digest for professional ${professional.id}`, err)
   }
 }

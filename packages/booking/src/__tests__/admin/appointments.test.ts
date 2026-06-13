@@ -6,11 +6,13 @@ vi.mock('../../lib/prisma.js', () => ({ prisma: prismaMock }))
 
 const sendAppointmentConfirmationMock = vi.fn()
 const sendPaymentReminderMock = vi.fn()
+const sendAppointmentCancelledMock = vi.fn()
 
 vi.mock('@schedly/notifications', () => ({
   EmailService: class {
     sendAppointmentConfirmation = sendAppointmentConfirmationMock
     sendPaymentReminder = sendPaymentReminderMock
+    sendAppointmentCancelled = sendAppointmentCancelledMock
   },
 }))
 
@@ -41,6 +43,7 @@ beforeEach(() => {
   resetMocks()
   sendAppointmentConfirmationMock.mockReset()
   sendPaymentReminderMock.mockReset()
+  sendAppointmentCancelledMock.mockReset()
   process.env.PROFESSIONAL_ID = 'pro1'
 })
 
@@ -186,6 +189,52 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
       .set('Authorization', token())
       .send({ status: 'confirmed' })
     expect(res.status).toBe(404)
+  })
+
+  it('sends a cancellation email when status is set to cancelled', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, status: 'cancelled' })
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    sendAppointmentCancelledMock.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/status')
+      .set('Authorization', token())
+      .send({ status: 'cancelled' })
+
+    expect(res.status).toBe(200)
+    await vi.waitFor(() => expect(sendAppointmentCancelledMock).toHaveBeenCalledWith(
+      APT.clientEmail,
+      expect.objectContaining({ clientName: APT.clientName, serviceName: APT.service.name }),
+    ))
+  })
+
+  it('does not send a cancellation email when status is set to confirmed', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, status: 'confirmed' })
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/status')
+      .set('Authorization', token())
+      .send({ status: 'confirmed' })
+
+    expect(res.status).toBe(200)
+    expect(sendAppointmentCancelledMock).not.toHaveBeenCalled()
+  })
+
+  it('does not fail the request when the cancellation email fails to send', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, status: 'cancelled' })
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    sendAppointmentCancelledMock.mockRejectedValue(new Error('Resend error'))
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/status')
+      .set('Authorization', token())
+      .send({ status: 'cancelled' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.data.status).toBe('cancelled')
   })
 })
 

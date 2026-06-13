@@ -11,6 +11,7 @@ const updateSchema = z.object({
   timezone: z.string().min(1).optional(),
   patientSearchField: z.enum(['name', 'email', 'rut', 'phone']).optional(),
   treatmentTypes: z.array(z.string().min(1)).optional(),
+  dailyDigestTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'dailyDigestTime must be HH:MM').optional(),
 })
 
 function serializeConfig(p: {
@@ -21,6 +22,7 @@ function serializeConfig(p: {
   timezone: string
   patientSearchField?: string
   treatmentTypes?: string[]
+  dailyDigestTime?: string
 }) {
   return {
     bookingWindowWeeks: p.bookingWindowWeeks,
@@ -30,6 +32,7 @@ function serializeConfig(p: {
     timezone: p.timezone,
     patientSearchField: (p.patientSearchField ?? 'name') as 'name' | 'email' | 'rut' | 'phone',
     treatmentTypes: p.treatmentTypes ?? [],
+    dailyDigestTime: p.dailyDigestTime ?? '16:00',
   }
 }
 

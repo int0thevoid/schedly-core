@@ -53,6 +53,20 @@ describe('GET /api/admin/config', () => {
     expect(res.body.data.treatmentTypes).toEqual([])
   })
 
+  it('returns dailyDigestTime', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, dailyDigestTime: '17:30' })
+    const res = await request(app).get('/api/admin/config').set('Authorization', token())
+    expect(res.status).toBe(200)
+    expect(res.body.data.dailyDigestTime).toBe('17:30')
+  })
+
+  it('defaults dailyDigestTime to 16:00 when not set', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, dailyDigestTime: undefined })
+    const res = await request(app).get('/api/admin/config').set('Authorization', token())
+    expect(res.status).toBe(200)
+    expect(res.body.data.dailyDigestTime).toBe('16:00')
+  })
+
   it('returns 404 when professional not found', async () => {
     prismaMock.professional.findUnique.mockResolvedValue(null)
     const res = await request(app).get('/api/admin/config').set('Authorization', token())
@@ -103,6 +117,28 @@ describe('PATCH /api/admin/config', () => {
     expect(prismaMock.professional.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { treatmentTypes: ['TCA'] } }),
     )
+  })
+
+  it('updates dailyDigestTime', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, dailyDigestTime: '18:00' })
+    const res = await request(app)
+      .patch('/api/admin/config')
+      .set('Authorization', token())
+      .send({ dailyDigestTime: '18:00' })
+    expect(res.status).toBe(200)
+    expect(res.body.data.dailyDigestTime).toBe('18:00')
+    expect(prismaMock.professional.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { dailyDigestTime: '18:00' } }),
+    )
+  })
+
+  it('returns 400 for invalid dailyDigestTime format', async () => {
+    const res = await request(app)
+      .patch('/api/admin/config')
+      .set('Authorization', token())
+      .send({ dailyDigestTime: '25:00' })
+    expect(res.status).toBe(400)
   })
 
   it('returns 400 when treatmentTypes contains an empty string', async () => {
