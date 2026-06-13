@@ -6,6 +6,7 @@ const sendAppointmentReminder = vi.fn().mockResolvedValue(undefined)
 const sendPaymentReminder = vi.fn().mockResolvedValue(undefined)
 const sendAppointmentConfirmation = vi.fn().mockResolvedValue(undefined)
 const sendReviewRequest = vi.fn().mockResolvedValue(undefined)
+const sendDailyDigest = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@schedly/notifications', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@schedly/notifications')>()
@@ -16,12 +17,14 @@ vi.mock('@schedly/notifications', async (importOriginal) => {
       sendPaymentReminder = sendPaymentReminder
       sendAppointmentConfirmation = sendAppointmentConfirmation
       sendReviewRequest = sendReviewRequest
+      sendDailyDigest = sendDailyDigest
     },
   }
 })
 
 import { prismaMock, resetMocks } from './helpers/prisma-mock.js'
-import { runNotificationsJob } from '../jobs/notifications.job.js'
+import { EmailService } from '@schedly/notifications'
+import { runNotificationsJob, sendDailyDigestIfNeeded } from '../jobs/notifications.job.js'
 
 const PROFESSIONAL = {
   id: 'pro1',
@@ -29,6 +32,8 @@ const PROFESSIONAL = {
   email: 'stefany@example.com',
   phone: '+56966898588',
   timezone: 'UTC',
+  dailyDigestTime: '16:00',
+  lastDailyDigestSentDate: null as string | null,
   transferRut: '12.345.678-9',
   transferBank: 'Banco Estado',
   transferAccountType: 'Cuenta Vista',
@@ -72,6 +77,7 @@ beforeEach(() => {
   sendPaymentReminder.mockClear()
   sendAppointmentConfirmation.mockClear()
   sendReviewRequest.mockClear()
+  sendDailyDigest.mockClear()
   process.env.PROFESSIONAL_ID = 'pro1'
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-06-15T08:00:00Z'))
@@ -187,5 +193,54 @@ describe('runNotificationsJob', () => {
     await runNotificationsJob()
 
     expect(prismaMock.appointment.findMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('sendDailyDigestIfNeeded', () => {
+  const emailService = new EmailService()
+
+  it('does not send if the digest was already sent today', async () => {
+    vi.setSystemTime(new Date('2026-06-15T16:05:00Z'))
+    const professional = { ...PROFESSIONAL, dailyDigestTime: '16:00', lastDailyDigestSentDate: '2026-06-15' }
+
+    await sendDailyDigestIfNeeded(professional, emailService)
+
+    expect(sendDailyDigest).not.toHaveBeenCalled()
+    expect(prismaMock.appointment.findMany).not.toHaveBeenCalled()
+  })
+
+  it('does not send outside the configured time window', async () => {
+    vi.setSystemTime(new Date('2026-06-15T08:00:00Z'))
+    const professional = { ...PROFESSIONAL, dailyDigestTime: '16:00', lastDailyDigestSentDate: null }
+
+    await sendDailyDigestIfNeeded(professional, emailService)
+
+    expect(sendDailyDigest).not.toHaveBeenCalled()
+    expect(prismaMock.appointment.findMany).not.toHaveBeenCalled()
+  })
+
+  it('sends the digest with tomorrow\'s appointments and marks lastDailyDigestSentDate', async () => {
+    vi.setSystemTime(new Date('2026-06-15T16:05:00Z'))
+    const professional = { ...PROFESSIONAL, dailyDigestTime: '16:00', lastDailyDigestSentDate: null }
+    const appointment = makeAppointment({
+      startDateTime: new Date('2026-06-16T14:00:00Z'),
+      endDateTime: new Date('2026-06-16T14:45:00Z'),
+      paymentStatus: 'paid',
+      attendanceConfirmed: true,
+    })
+    prismaMock.appointment.findMany.mockResolvedValue([appointment])
+
+    await sendDailyDigestIfNeeded(professional, emailService)
+
+    expect(sendDailyDigest).toHaveBeenCalledWith(
+      'stefany@example.com',
+      expect.objectContaining({
+        appointments: [expect.objectContaining({ clientName: 'Ana', color: '#8FA88B', colorLabel: 'Confirmado y pagado' })],
+      }),
+    )
+    expect(prismaMock.professional.update).toHaveBeenCalledWith({
+      where: { id: 'pro1' },
+      data: { lastDailyDigestSentDate: '2026-06-15' },
+    })
   })
 })

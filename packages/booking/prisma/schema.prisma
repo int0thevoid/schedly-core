@@ -23,6 +23,9 @@ model Professional {
   patientSearchField String   @default("name")
   treatmentTypes     String[] @default([])
 
+  dailyDigestTime         String  @default("16:00")
+  lastDailyDigestSentDate String?
+
   transferRut           String?
   transferBank          String?
   transferAccountType   String?

@@ -4,6 +4,8 @@ import { appointmentReminderTemplate, type AppointmentReminderData } from '../te
 import { paymentReminderTemplate, type PaymentReminderData } from '../templates/payment-reminder.js'
 import { reviewRequestTemplate, type ReviewRequestData } from '../templates/review-request.js'
 import { confirmAttendancePageTemplate } from '../templates/confirm-attendance-page.js'
+import { dailyDigestTemplate, type DailyDigestData } from '../templates/daily-digest.js'
+import { appointmentCancelledTemplate, type AppointmentCancelledData } from '../templates/appointment-cancelled.js'
 
 const TRANSFER_DATA = {
   rut: '12.345.678-9',
@@ -172,6 +174,89 @@ describe('reviewRequestTemplate', () => {
   it('falls back to plain text when googleReviewLink is absent', () => {
     const { html } = reviewRequestTemplate(baseData)
     expect(html).not.toContain('Dejar reseña en Google')
+  })
+})
+
+describe('dailyDigestTemplate', () => {
+  const baseData: DailyDigestData = {
+    professionalName: 'Ps. Stefany Osorio',
+    date: 'Martes 10 de junio de 2026',
+    appointments: [
+      {
+        time: '14:00',
+        clientName: 'Ana Pérez',
+        serviceName: 'Primera visita',
+        modality: 'Online',
+        color: '#8FA88B',
+        colorLabel: 'Confirmado y pagado',
+      },
+    ],
+    adminUrl: 'https://admin.example.com/admin/agenda',
+  }
+
+  it('returns a subject including the date', () => {
+    const { subject } = dailyDigestTemplate(baseData)
+    expect(subject).toBe('📅 Tu agenda de mañana — Martes 10 de junio de 2026')
+  })
+
+  it('includes the appointment time, client and service', () => {
+    const { html } = dailyDigestTemplate(baseData)
+    expect(html).toContain('14:00')
+    expect(html).toContain('Ana Pérez')
+    expect(html).toContain('Primera visita')
+  })
+
+  it('includes the color legend', () => {
+    const { html } = dailyDigestTemplate(baseData)
+    expect(html).toContain('Confirmado y pagado')
+    expect(html).toContain('Confirmado, pago pendiente')
+    expect(html).toContain('Pagado, sin confirmar asistencia')
+    expect(html).toContain('Sin confirmar ni pagar')
+  })
+
+  it('includes a "Ver agenda completa" button linking to adminUrl', () => {
+    const { html } = dailyDigestTemplate(baseData)
+    expect(html).toContain(baseData.adminUrl)
+    expect(html).toContain('Ver agenda completa')
+  })
+
+  it('shows "No tienes citas para mañana" when appointments is empty', () => {
+    const { html } = dailyDigestTemplate({ ...baseData, appointments: [] })
+    expect(html).toContain('No tienes citas para mañana')
+  })
+})
+
+describe('appointmentCancelledTemplate', () => {
+  const baseData: AppointmentCancelledData = {
+    clientName: 'Ana Pérez',
+    serviceName: 'Primera visita',
+    date: 'Martes 10 de junio de 2026',
+    time: '14:00',
+    professionalName: 'Ps. Stefany Osorio',
+    professionalPhone: '+56966898588',
+  }
+
+  it('returns a subject including the service name', () => {
+    const { subject } = appointmentCancelledTemplate(baseData)
+    expect(subject).toBe('❌ Tu cita ha sido cancelada — Primera visita')
+  })
+
+  it('includes the appointment date and time', () => {
+    const { html } = appointmentCancelledTemplate(baseData)
+    expect(html).toContain(baseData.date)
+    expect(html).toContain(baseData.time)
+  })
+
+  it('includes instructions to reagendar with the professional phone', () => {
+    const { html } = appointmentCancelledTemplate(baseData)
+    expect(html).toContain('reagendar')
+    expect(html).toContain(baseData.professionalPhone)
+  })
+
+  it('escapes HTML in client-provided fields', () => {
+    const { html } = appointmentCancelledTemplate({ ...baseData, clientName: '<script>alert(1)</script>' })
+    expect(html).not.toContain('<script>alert(1)</script>')
+    expect(html).toContain('&lt;script&gt;')
   })
 })
 

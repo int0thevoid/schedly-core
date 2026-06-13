@@ -1,6 +1,9 @@
 import type {
+  AppointmentCancelledData,
   AppointmentConfirmationData,
   AppointmentReminderData,
+  DailyDigestAppointment,
+  DailyDigestData,
   PaymentReminderData,
   TransferData,
 } from '@schedly/notifications'
@@ -22,6 +25,11 @@ export function formatAppointmentTimeRange(start: Date, end: Date, timezone: str
   return `${fmt.format(start)} - ${fmt.format(end)}`
 }
 
+/** Formatea una hora como "14:00" en la zona horaria del profesional. */
+export function formatAppointmentTime(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('es-CL', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
+}
+
 function toModality(modality: string): 'presential' | 'online' {
   return modality === 'online' ? 'online' : 'presential'
 }
@@ -30,6 +38,31 @@ function toModality(modality: string): 'presential' | 'online' {
 function buildConfirmAttendanceUrl(appointmentId: string): string {
   const base = process.env.API_BASE_URL ?? 'http://localhost:3001'
   return `${base}/api/appointments/${appointmentId}/confirm-attendance`
+}
+
+/** Construye la URL al panel de administración (agenda) usada en el resumen diario. */
+function buildAdminAgendaUrl(): string {
+  const base = process.env.ADMIN_URL ?? 'http://localhost:5173'
+  return `${base}/admin/agenda`
+}
+
+/**
+ * Determina el color y la etiqueta de una cita según su estado de pago y de
+ * confirmación de asistencia, para usar en el resumen diario del profesional.
+ */
+export function getAppointmentColorInfo(appointment: {
+  paymentStatus: string
+  attendanceConfirmed: boolean
+}): { color: string; colorLabel: string } {
+  const paid = appointment.paymentStatus === 'paid'
+  if (appointment.attendanceConfirmed) {
+    return paid
+      ? { color: '#8FA88B', colorLabel: 'Confirmado y pagado' }
+      : { color: '#6B9BC3', colorLabel: 'Confirmado, pago pendiente' }
+  }
+  return paid
+    ? { color: '#E9C46A', colorLabel: 'Pagado, sin confirmar asistencia' }
+    : { color: '#E76F51', colorLabel: 'Sin confirmar ni pagar' }
 }
 
 /** Construye los datos de transferencia del profesional, o undefined si no están todos configurados. */
@@ -99,6 +132,45 @@ export function buildPaymentReminderData(appointment: AppointmentWithService, pr
     time: formatAppointmentTimeRange(appointment.startDateTime, appointment.endDateTime, professional.timezone),
     price: appointment.service.price,
     transferData,
+    professionalPhone: professional.phone ?? '',
+  }
+}
+
+/** Construye los datos del resumen diario a partir de las citas (no canceladas) del día siguiente. */
+export function buildDailyDigestData(
+  appointments: AppointmentWithService[],
+  professional: Professional,
+  date: string
+): DailyDigestData {
+  const digestAppointments: DailyDigestAppointment[] = appointments
+    .filter((appointment) => appointment.status !== 'cancelled')
+    .map((appointment) => {
+      const { color, colorLabel } = getAppointmentColorInfo(appointment)
+      return {
+        time: formatAppointmentTime(appointment.startDateTime, professional.timezone),
+        clientName: appointment.clientName,
+        serviceName: appointment.service.name,
+        modality: toModality(appointment.modality) === 'online' ? 'Online' : 'Presencial',
+        color,
+        colorLabel,
+      }
+    })
+
+  return {
+    professionalName: professional.name,
+    date,
+    appointments: digestAppointments,
+    adminUrl: buildAdminAgendaUrl(),
+  }
+}
+
+export function buildAppointmentCancelledData(appointment: AppointmentWithService, professional: Professional): AppointmentCancelledData {
+  return {
+    clientName: appointment.clientName,
+    serviceName: appointment.service.name,
+    date: formatAppointmentDate(appointment.startDateTime, professional.timezone),
+    time: formatAppointmentTimeRange(appointment.startDateTime, appointment.endDateTime, professional.timezone),
+    professionalName: professional.name,
     professionalPhone: professional.phone ?? '',
   }
 }

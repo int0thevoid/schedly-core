@@ -3,30 +3,15 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
 import { getEmailService } from '../../lib/email-service.js'
-import { buildAppointmentConfirmationData, buildPaymentReminderData } from '../../lib/notification-data.js'
+import {
+  buildAppointmentCancelledData,
+  buildAppointmentConfirmationData,
+  buildPaymentReminderData,
+  type AppointmentWithService,
+} from '../../lib/notification-data.js'
+import { dayRangeInTZ, todayInTZ } from '../../lib/date.js'
 
 const TZ = 'America/Santiago'
-
-function todayInTZ(tz: string): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: tz })
-}
-
-function dayRangeInTZ(dateStr: string, tz: string): { gte: Date; lte: Date } {
-  // Use noon as reference to avoid DST edge cases when computing the UTC offset
-  const ref = new Date(`${dateStr}T12:00:00Z`)
-  const localNoon = new Date(
-    ref.toLocaleString('en-US', {
-      timeZone: tz,
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-    }),
-  )
-  const offsetMs = ref.getTime() - localNoon.getTime()
-  return {
-    gte: new Date(new Date(`${dateStr}T00:00:00Z`).getTime() + offsetMs),
-    lte: new Date(new Date(`${dateStr}T23:59:59.999Z`).getTime() + offsetMs),
-  }
-}
 
 const weeklySchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be YYYY-MM-DD'),
@@ -178,7 +163,7 @@ export async function updateAppointmentStatus(req: Request, res: Response): Prom
     return
   }
   const { id } = req.params
-  const appointment = await prisma.appointment.findUnique({ where: { id } })
+  const appointment = await prisma.appointment.findUnique({ where: { id }, include: { service: true } })
   if (!appointment) {
     fail(res, 'Appointment not found', 404)
     return
@@ -188,6 +173,22 @@ export async function updateAppointmentStatus(req: Request, res: Response): Prom
     data: { status: parsed.data.status },
   })
   ok(res, updated)
+
+  if (parsed.data.status === 'cancelled') {
+    void sendCancellationEmail(appointment)
+  }
+}
+
+/** Envía el correo de cancelación al cliente. Best-effort: un fallo se registra pero no afecta la respuesta ya enviada. */
+async function sendCancellationEmail(appointment: AppointmentWithService): Promise<void> {
+  try {
+    const professional = await prisma.professional.findUnique({ where: { id: appointment.professionalId } })
+    if (!professional) return
+    const data = buildAppointmentCancelledData(appointment, professional)
+    await getEmailService().sendAppointmentCancelled(appointment.clientEmail, data)
+  } catch (err) {
+    console.error(`[notifications] failed to send cancellation email for appointment ${appointment.id}`, err)
+  }
 }
 
 export async function updateAppointmentPayment(req: Request, res: Response): Promise<void> {
