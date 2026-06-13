@@ -1,4 +1,4 @@
-import { COLORS, contactFooter, escapeHtml, googleMapsLink, renderLayout, type EmailTemplate } from './layout.js'
+import { COLORS, confirmAttendanceButton, contactFooter, escapeHtml, googleMapsLink, renderLayout, type EmailTemplate } from './layout.js'
 
 export interface AppointmentReminderData {
   clientName: string
@@ -11,6 +11,7 @@ export interface AppointmentReminderData {
   professionalName: string
   professionalPhone: string
   hoursUntil: number
+  confirmAttendanceUrl?: string
 }
 
 function renderLocation(data: AppointmentReminderData): string {
@@ -48,6 +49,7 @@ export function appointmentReminderTemplate(data: AppointmentReminderData): Emai
     </div>
 
     ${renderLocation(data)}
+    ${data.confirmAttendanceUrl ? confirmAttendanceButton(data.confirmAttendanceUrl) : ''}
   `
 
   return {

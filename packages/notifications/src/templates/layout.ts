@@ -78,3 +78,11 @@ export function renderLayout({ professionalName, bodyHtml, footerHtml }: LayoutO
 export function contactFooter(professionalPhone: string): string {
   return `Ante cualquier consulta escríbenos al <strong style="color:${COLORS.text};">${escapeHtml(professionalPhone)}</strong>`
 }
+
+/** Botón "Confirmar asistencia" que enlaza al endpoint público de confirmación. */
+export function confirmAttendanceButton(confirmAttendanceUrl: string): string {
+  return `
+    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:24px 0 0;text-align:center;">
+      <a href="${escapeHtml(confirmAttendanceUrl)}" style="display:inline-block;background-color:${COLORS.primary};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 24px;border-radius:8px;">✅ Confirmar asistencia</a>
+    </p>`
+}

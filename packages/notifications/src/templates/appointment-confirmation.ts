@@ -1,4 +1,4 @@
-import { COLORS, contactFooter, escapeHtml, formatCLP, googleMapsLink, renderLayout, type EmailTemplate } from './layout.js'
+import { COLORS, confirmAttendanceButton, contactFooter, escapeHtml, formatCLP, googleMapsLink, renderLayout, type EmailTemplate } from './layout.js'
 
 export interface TransferData {
   rut: string
@@ -20,6 +20,7 @@ export interface AppointmentConfirmationData {
   professionalName: string
   professionalPhone: string
   transferData?: TransferData
+  confirmAttendanceUrl?: string
 }
 
 function renderLocation(data: AppointmentConfirmationData): string {
@@ -75,6 +76,7 @@ export function appointmentConfirmationTemplate(data: AppointmentConfirmationDat
 
     ${renderLocation(data)}
     ${data.transferData ? renderTransferData(data.transferData, data.price) : ''}
+    ${data.confirmAttendanceUrl ? confirmAttendanceButton(data.confirmAttendanceUrl) : ''}
   `
 
   return {

@@ -4,6 +4,16 @@ import jwt from 'jsonwebtoken'
 
 vi.mock('../../lib/prisma.js', () => ({ prisma: prismaMock }))
 
+const sendAppointmentConfirmationMock = vi.fn()
+const sendPaymentReminderMock = vi.fn()
+
+vi.mock('@schedly/notifications', () => ({
+  EmailService: class {
+    sendAppointmentConfirmation = sendAppointmentConfirmationMock
+    sendPaymentReminder = sendPaymentReminderMock
+  },
+}))
+
 import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
@@ -21,8 +31,16 @@ const APT = {
   service: { id: 's1', name: 'Sesión' },
 }
 
+const PROFESSIONAL = {
+  id: 'pro1', name: 'Ps. Stefany Osorio', phone: '+56966898588', timezone: 'America/Santiago',
+  transferRut: '12.345.678-9', transferBank: 'banco_chile', transferAccountType: 'vista',
+  transferAccountNumber: '123456789', transferEmail: 'pagos@example.com',
+}
+
 beforeEach(() => {
   resetMocks()
+  sendAppointmentConfirmationMock.mockReset()
+  sendPaymentReminderMock.mockReset()
   process.env.PROFESSIONAL_ID = 'pro1'
 })
 
@@ -309,5 +327,130 @@ describe('PATCH /api/admin/appointments/:id/attendance', () => {
       .set('Authorization', token())
       .send({ attended: true })
     expect(res.status).toBe(404)
+  })
+})
+
+describe('PATCH /api/admin/appointments/:id/notify-confirmation', () => {
+  const APT_WITH_SERVICE = { ...APT, service: { ...APT.service, price: 30000 } }
+
+  it('sends the appointment confirmation email again', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT_WITH_SERVICE)
+    prismaMock.service.findUnique.mockResolvedValue(APT_WITH_SERVICE.service)
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    sendAppointmentConfirmationMock.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/notify-confirmation')
+      .set('Authorization', token())
+      .send({})
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(sendAppointmentConfirmationMock).toHaveBeenCalledWith(
+      APT.clientEmail,
+      expect.objectContaining({ clientName: APT.clientName }),
+    )
+  })
+
+  it('returns 404 when the appointment does not exist', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(null)
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/bad/notify-confirmation')
+      .set('Authorization', token())
+      .send({})
+
+    expect(res.status).toBe(404)
+    expect(sendAppointmentConfirmationMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 502 when the email fails to send', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT_WITH_SERVICE)
+    prismaMock.service.findUnique.mockResolvedValue(APT_WITH_SERVICE.service)
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    sendAppointmentConfirmationMock.mockRejectedValue(new Error('Resend error'))
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/notify-confirmation')
+      .set('Authorization', token())
+      .send({})
+
+    expect(res.status).toBe(502)
+  })
+})
+
+describe('POST /api/admin/appointments/:id/notify-payment', () => {
+  const APT_WITH_SERVICE = { ...APT, service: { ...APT.service, price: 30000 } }
+
+  it('sends the payment reminder email', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT_WITH_SERVICE)
+    prismaMock.service.findUnique.mockResolvedValue(APT_WITH_SERVICE.service)
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    sendPaymentReminderMock.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .post('/api/admin/appointments/a1/notify-payment')
+      .set('Authorization', token())
+      .send({})
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(sendPaymentReminderMock).toHaveBeenCalledWith(
+      APT.clientEmail,
+      expect.objectContaining({ clientName: APT.clientName }),
+    )
+  })
+
+  it('returns 404 when the appointment does not exist', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(null)
+
+    const res = await request(app)
+      .post('/api/admin/appointments/bad/notify-payment')
+      .set('Authorization', token())
+      .send({})
+
+    expect(res.status).toBe(404)
+    expect(sendPaymentReminderMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when the appointment is already paid', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue({ ...APT_WITH_SERVICE, paymentStatus: 'paid' })
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+
+    const res = await request(app)
+      .post('/api/admin/appointments/a1/notify-payment')
+      .set('Authorization', token())
+      .send({})
+
+    expect(res.status).toBe(400)
+    expect(sendPaymentReminderMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when the professional has no transfer data configured', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT_WITH_SERVICE)
+    prismaMock.service.findUnique.mockResolvedValue(APT_WITH_SERVICE.service)
+    prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, transferBank: null })
+
+    const res = await request(app)
+      .post('/api/admin/appointments/a1/notify-payment')
+      .set('Authorization', token())
+      .send({})
+
+    expect(res.status).toBe(400)
+    expect(sendPaymentReminderMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 502 when the email fails to send', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT_WITH_SERVICE)
+    prismaMock.service.findUnique.mockResolvedValue(APT_WITH_SERVICE.service)
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    sendPaymentReminderMock.mockRejectedValue(new Error('Resend error'))
+
+    const res = await request(app)
+      .post('/api/admin/appointments/a1/notify-payment')
+      .set('Authorization', token())
+      .send({})
+
+    expect(res.status).toBe(502)
   })
 })
