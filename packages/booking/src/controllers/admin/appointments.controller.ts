@@ -2,6 +2,8 @@ import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
+import { getEmailService } from '../../lib/email-service.js'
+import { buildAppointmentConfirmationData, buildPaymentReminderData } from '../../lib/notification-data.js'
 
 const TZ = 'America/Santiago'
 
@@ -231,4 +233,77 @@ export async function updateAppointmentAttendance(req: Request, res: Response): 
     data: { attended: parsed.data.attended },
   })
   ok(res, updated)
+}
+
+/** Reenvía el correo de confirmación de cita (incluye el botón "Confirmar asistencia"). */
+export async function notifyAppointmentConfirmation(req: Request, res: Response): Promise<void> {
+  const { id } = req.params
+  const appointment = await prisma.appointment.findUnique({ where: { id } })
+  if (!appointment) {
+    fail(res, 'Appointment not found', 404)
+    return
+  }
+
+  const service = await prisma.service.findUnique({ where: { id: appointment.serviceId } })
+  if (!service) {
+    fail(res, 'Service not found', 404)
+    return
+  }
+
+  const professional = await prisma.professional.findUnique({ where: { id: appointment.professionalId } })
+  if (!professional) {
+    fail(res, 'Professional not found', 404)
+    return
+  }
+
+  const data = buildAppointmentConfirmationData({ ...appointment, service }, professional)
+  try {
+    await getEmailService().sendAppointmentConfirmation(appointment.clientEmail, data)
+  } catch (err) {
+    console.error(`[notifications] failed to send confirmation email for appointment ${id}`, err)
+    fail(res, 'Failed to send email', 502)
+    return
+  }
+  ok(res, { sent: true })
+}
+
+/** Envía un recordatorio de pago pendiente (reutiliza el template payment-reminder). */
+export async function notifyPaymentPending(req: Request, res: Response): Promise<void> {
+  const { id } = req.params
+  const appointment = await prisma.appointment.findUnique({ where: { id } })
+  if (!appointment) {
+    fail(res, 'Appointment not found', 404)
+    return
+  }
+  if (appointment.paymentStatus !== 'unpaid') {
+    fail(res, 'Appointment is already paid', 400)
+    return
+  }
+
+  const service = await prisma.service.findUnique({ where: { id: appointment.serviceId } })
+  if (!service) {
+    fail(res, 'Service not found', 404)
+    return
+  }
+
+  const professional = await prisma.professional.findUnique({ where: { id: appointment.professionalId } })
+  if (!professional) {
+    fail(res, 'Professional not found', 404)
+    return
+  }
+
+  const data = buildPaymentReminderData({ ...appointment, service }, professional)
+  if (!data) {
+    fail(res, 'Transfer data not configured', 400)
+    return
+  }
+
+  try {
+    await getEmailService().sendPaymentReminder(appointment.clientEmail, data)
+  } catch (err) {
+    console.error(`[notifications] failed to send payment reminder for appointment ${id}`, err)
+    fail(res, 'Failed to send email', 502)
+    return
+  }
+  ok(res, { sent: true })
 }

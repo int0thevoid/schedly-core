@@ -106,6 +106,9 @@ model Appointment {
 
   attended Boolean?
 
+  attendanceConfirmed   Boolean   @default(false)
+  attendanceConfirmedAt DateTime?
+
   notes String?
 
   reminderSentAt        DateTime?

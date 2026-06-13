@@ -26,6 +26,12 @@ function toModality(modality: string): 'presential' | 'online' {
   return modality === 'online' ? 'online' : 'presential'
 }
 
+/** Construye la URL pública (sin autenticación) que el cliente usa para confirmar su asistencia. */
+function buildConfirmAttendanceUrl(appointmentId: string): string {
+  const base = process.env.API_BASE_URL ?? 'http://localhost:3001'
+  return `${base}/api/appointments/${appointmentId}/confirm-attendance`
+}
+
 /** Construye los datos de transferencia del profesional, o undefined si no están todos configurados. */
 export function buildTransferData(professional: Professional): TransferData | undefined {
   const { transferRut, transferBank, transferAccountType, transferAccountNumber, transferEmail } = professional
@@ -57,6 +63,7 @@ export function buildAppointmentConfirmationData(
     professionalName: professional.name,
     professionalPhone: professional.phone ?? '',
     transferData: appointment.paymentStatus === 'unpaid' ? buildTransferData(professional) : undefined,
+    confirmAttendanceUrl: buildConfirmAttendanceUrl(appointment.id),
   }
 }
 
@@ -76,6 +83,7 @@ export function buildAppointmentReminderData(
     professionalName: professional.name,
     professionalPhone: professional.phone ?? '',
     hoursUntil,
+    confirmAttendanceUrl: hoursUntil === 24 ? buildConfirmAttendanceUrl(appointment.id) : undefined,
   }
 }
 

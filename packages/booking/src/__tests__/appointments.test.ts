@@ -141,6 +141,49 @@ describe('GET /api/appointments/:id', () => {
   })
 })
 
+describe('GET /api/appointments/:id/confirm-attendance', () => {
+  const PROFESSIONAL = { id: 'pro1', name: 'Ps. Stefany Osorio' }
+
+  it('marks attendance as confirmed and returns a thank-you page', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue({ ...APPOINTMENT, attendanceConfirmed: false })
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    prismaMock.appointment.update.mockResolvedValue({ ...APPOINTMENT, attendanceConfirmed: true })
+
+    const res = await request(app).get('/api/appointments/apt1/confirm-attendance')
+
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toContain('text/html')
+    expect(res.text).toContain('¡Gracias por confirmar!')
+    expect(prismaMock.appointment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'apt1' },
+        data: expect.objectContaining({ attendanceConfirmed: true, attendanceConfirmedAt: expect.any(Date) }),
+      }),
+    )
+  })
+
+  it('returns a not-found page when the appointment does not exist', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(null)
+
+    const res = await request(app).get('/api/appointments/bad/confirm-attendance')
+
+    expect(res.status).toBe(404)
+    expect(res.text).toContain('Cita no encontrada')
+    expect(prismaMock.appointment.update).not.toHaveBeenCalled()
+  })
+
+  it('is idempotent: shows "already confirmed" without updating again', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue({ ...APPOINTMENT, attendanceConfirmed: true })
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+
+    const res = await request(app).get('/api/appointments/apt1/confirm-attendance')
+
+    expect(res.status).toBe(200)
+    expect(res.text).toContain('Ya habías confirmado')
+    expect(prismaMock.appointment.update).not.toHaveBeenCalled()
+  })
+})
+
 describe('PATCH /api/appointments/:id/cancel', () => {
   it('cancels a pending appointment within window', async () => {
     const future = new Date(Date.now() + 48 * 60 * 60 * 1000)

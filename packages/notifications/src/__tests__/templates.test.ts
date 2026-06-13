@@ -3,6 +3,7 @@ import { appointmentConfirmationTemplate, type AppointmentConfirmationData } fro
 import { appointmentReminderTemplate, type AppointmentReminderData } from '../templates/appointment-reminder.js'
 import { paymentReminderTemplate, type PaymentReminderData } from '../templates/payment-reminder.js'
 import { reviewRequestTemplate, type ReviewRequestData } from '../templates/review-request.js'
+import { confirmAttendancePageTemplate } from '../templates/confirm-attendance-page.js'
 
 const TRANSFER_DATA = {
   rut: '12.345.678-9',
@@ -64,6 +65,17 @@ describe('appointmentConfirmationTemplate', () => {
     const { html } = appointmentConfirmationTemplate(baseData)
     expect(html).toContain(baseData.professionalPhone)
   })
+
+  it('includes a "Confirmar asistencia" button when confirmAttendanceUrl is present', () => {
+    const { html } = appointmentConfirmationTemplate({ ...baseData, confirmAttendanceUrl: 'https://api.example.com/api/appointments/apt1/confirm-attendance' })
+    expect(html).toContain('https://api.example.com/api/appointments/apt1/confirm-attendance')
+    expect(html).toContain('Confirmar asistencia')
+  })
+
+  it('omits the "Confirmar asistencia" button when confirmAttendanceUrl is absent', () => {
+    const { html } = appointmentConfirmationTemplate(baseData)
+    expect(html).not.toContain('Confirmar asistencia')
+  })
 })
 
 describe('appointmentReminderTemplate', () => {
@@ -97,6 +109,17 @@ describe('appointmentReminderTemplate', () => {
     const { html } = appointmentReminderTemplate(baseData)
     expect(html).toContain(baseData.date)
     expect(html).toContain(baseData.time)
+  })
+
+  it('includes a "Confirmar asistencia" button when confirmAttendanceUrl is present', () => {
+    const { html } = appointmentReminderTemplate({ ...baseData, confirmAttendanceUrl: 'https://api.example.com/api/appointments/apt1/confirm-attendance' })
+    expect(html).toContain('https://api.example.com/api/appointments/apt1/confirm-attendance')
+    expect(html).toContain('Confirmar asistencia')
+  })
+
+  it('omits the "Confirmar asistencia" button when confirmAttendanceUrl is absent', () => {
+    const { html } = appointmentReminderTemplate(baseData)
+    expect(html).not.toContain('Confirmar asistencia')
   })
 })
 
@@ -149,5 +172,23 @@ describe('reviewRequestTemplate', () => {
   it('falls back to plain text when googleReviewLink is absent', () => {
     const { html } = reviewRequestTemplate(baseData)
     expect(html).not.toContain('Dejar reseña en Google')
+  })
+})
+
+describe('confirmAttendancePageTemplate', () => {
+  it('shows a thank-you message for "confirmed"', () => {
+    const html = confirmAttendancePageTemplate({ status: 'confirmed', professionalName: 'Ps. Stefany Osorio' })
+    expect(html).toContain('¡Gracias por confirmar!')
+    expect(html).toContain('Ps. Stefany Osorio')
+  })
+
+  it('shows a different message for "already-confirmed"', () => {
+    const html = confirmAttendancePageTemplate({ status: 'already-confirmed', professionalName: 'Ps. Stefany Osorio' })
+    expect(html).toContain('Ya habías confirmado')
+  })
+
+  it('shows a not-found message for "not-found"', () => {
+    const html = confirmAttendancePageTemplate({ status: 'not-found' })
+    expect(html).toContain('Cita no encontrada')
   })
 })

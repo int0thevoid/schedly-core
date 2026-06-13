@@ -1,18 +1,11 @@
 import type { Request, Response } from 'express'
 import { z } from 'zod'
-import { EmailService } from '@schedly/notifications'
+import { confirmAttendancePageTemplate } from '@schedly/notifications'
 import { prisma } from '../lib/prisma.js'
 import { fail, ok } from '../lib/response.js'
 import { buildAppointmentConfirmationData } from '../lib/notification-data.js'
+import { getEmailService } from '../lib/email-service.js'
 import type { Appointment, Service } from '../generated/prisma/index.js'
-
-let emailService: EmailService | undefined
-
-/** Instancia el EmailService de forma perezosa para no fallar al cargar el módulo si RESEND_API_KEY no está configurada. */
-function getEmailService(): EmailService {
-  emailService ??= new EmailService()
-  return emailService
-}
 
 const createSchema = z.object({
   serviceId: z.string().min(1),
@@ -124,6 +117,30 @@ export async function getAppointment(req: Request, res: Response): Promise<void>
     return
   }
   ok(res, appointment)
+}
+
+/** Endpoint público (sin autenticación) enlazado desde los emails de confirmación y recordatorio. */
+export async function confirmAttendance(req: Request, res: Response): Promise<void> {
+  const { id } = req.params
+  const appointment = await prisma.appointment.findUnique({ where: { id } })
+  if (!appointment) {
+    res.status(404).type('html').send(confirmAttendancePageTemplate({ status: 'not-found' }))
+    return
+  }
+
+  const professional = await prisma.professional.findUnique({ where: { id: appointment.professionalId } })
+
+  if (appointment.attendanceConfirmed) {
+    res.type('html').send(confirmAttendancePageTemplate({ status: 'already-confirmed', professionalName: professional?.name }))
+    return
+  }
+
+  await prisma.appointment.update({
+    where: { id },
+    data: { attendanceConfirmed: true, attendanceConfirmedAt: new Date() },
+  })
+
+  res.type('html').send(confirmAttendancePageTemplate({ status: 'confirmed', professionalName: professional?.name }))
 }
 
 export async function cancelAppointment(req: Request, res: Response): Promise<void> {
