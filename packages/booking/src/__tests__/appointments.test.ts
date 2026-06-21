@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import request from 'supertest'
 import jwt from 'jsonwebtoken'
 
@@ -19,7 +19,9 @@ const APPOINTMENT = {
   startDateTime: new Date('2026-12-15T14:00:00Z'),
   endDateTime: new Date('2026-12-15T14:50:00Z'),
   modality: 'online', status: 'pending', paymentStatus: 'unpaid',
-  paymentAmount: null, notes: null,
+  paymentAmount: null, paymentMethod: null, notes: null,
+  bookingFlow: 'advance', paymentDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  autoCancelledAt: null, attendanceConfirmed: false, attendanceConfirmedAt: null,
   createdAt: new Date(), updatedAt: new Date(),
 }
 
@@ -35,6 +37,11 @@ const VALID_BODY = {
 beforeEach(() => {
   resetMocks()
   process.env.PROFESSIONAL_ID = 'pro1'
+  vi.useRealTimers()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('POST /api/appointments', () => {
@@ -123,6 +130,62 @@ describe('POST /api/appointments', () => {
       create: expect.objectContaining({ rut: '12345678-5' }),
       update: expect.objectContaining({ rut: '12345678-5' }),
     }))
+  })
+
+  it('auto-confirms and marks as paid when paymentMethod is cash', async () => {
+    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+    await request(app).post('/api/appointments').send({ ...VALID_BODY, paymentMethod: 'cash' })
+
+    expect(prismaMock.appointment.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: 'confirmed',
+        paymentStatus: 'paid',
+        paymentMethod: 'cash',
+        paymentAmount: SERVICE.price,
+      }),
+    }))
+  })
+
+  it('returns 400 for invalid paymentMethod', async () => {
+    const res = await request(app).post('/api/appointments').send({ ...VALID_BODY, paymentMethod: 'bitcoin' })
+    expect(res.status).toBe(400)
+  })
+
+  it('stores bookingFlow=advance and paymentDeadline≈24h ahead for a future appointment', async () => {
+    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+    await request(app).post('/api/appointments').send(VALID_BODY)
+
+    const createCall = prismaMock.appointment.create.mock.calls[0][0]
+    expect(createCall.data.bookingFlow).toBe('advance')
+    const deadline = createCall.data.paymentDeadline as Date
+    const expected = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    expect(Math.abs(deadline.getTime() - expected.getTime())).toBeLessThan(5000)
+  })
+
+  it('stores bookingFlow=same_day and paymentDeadline=endDateTime for same-day appointments', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-12-15T08:00:00Z'))
+
+    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+    await request(app).post('/api/appointments').send(VALID_BODY)
+
+    const createCall = prismaMock.appointment.create.mock.calls[0][0]
+    expect(createCall.data.bookingFlow).toBe('same_day')
+    const start = new Date('2026-12-15T14:00:00Z')
+    const expectedDeadline = new Date(start.getTime() + SERVICE.duration * 60_000)
+    expect(createCall.data.paymentDeadline).toEqual(expectedDeadline)
   })
 })
 

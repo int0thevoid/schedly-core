@@ -7,6 +7,7 @@ const sendPaymentReminder = vi.fn().mockResolvedValue(undefined)
 const sendAppointmentConfirmation = vi.fn().mockResolvedValue(undefined)
 const sendReviewRequest = vi.fn().mockResolvedValue(undefined)
 const sendDailyDigest = vi.fn().mockResolvedValue(undefined)
+const sendAppointmentAutoCancelled = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@schedly/notifications', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@schedly/notifications')>()
@@ -18,13 +19,14 @@ vi.mock('@schedly/notifications', async (importOriginal) => {
       sendAppointmentConfirmation = sendAppointmentConfirmation
       sendReviewRequest = sendReviewRequest
       sendDailyDigest = sendDailyDigest
+      sendAppointmentAutoCancelled = sendAppointmentAutoCancelled
     },
   }
 })
 
 import { prismaMock, resetMocks } from './helpers/prisma-mock.js'
 import { EmailService } from '@schedly/notifications'
-import { runNotificationsJob, sendDailyDigestIfNeeded } from '../jobs/notifications.job.js'
+import { autoCancelUnpaidAppointments, runNotificationsJob, sendDailyDigestIfNeeded } from '../jobs/notifications.job.js'
 
 const PROFESSIONAL = {
   id: 'pro1',
@@ -78,6 +80,7 @@ beforeEach(() => {
   sendAppointmentConfirmation.mockClear()
   sendReviewRequest.mockClear()
   sendDailyDigest.mockClear()
+  sendAppointmentAutoCancelled.mockClear()
   process.env.PROFESSIONAL_ID = 'pro1'
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-06-15T08:00:00Z'))
@@ -191,6 +194,50 @@ describe('runNotificationsJob', () => {
     prismaMock.professional.findUnique.mockResolvedValue(null)
 
     await runNotificationsJob()
+
+    expect(prismaMock.appointment.findMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('autoCancelUnpaidAppointments', () => {
+  it('cancels past-deadline unpaid pending appointments and sends auto-cancelled email', async () => {
+    vi.setSystemTime(new Date('2026-06-15T10:00:00Z'))
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+
+    const overdue = makeAppointment({
+      status: 'pending',
+      paymentStatus: 'unpaid',
+      paymentDeadline: new Date('2026-06-15T09:00:00Z'),
+    })
+    prismaMock.appointment.findMany.mockResolvedValue([overdue])
+    prismaMock.appointment.update.mockResolvedValue({ ...overdue, status: 'cancelled', autoCancelledAt: new Date() })
+
+    await autoCancelUnpaidAppointments()
+
+    expect(prismaMock.appointment.update).toHaveBeenCalledWith({
+      where: { id: 'apt1' },
+      data: expect.objectContaining({ status: 'cancelled', autoCancelledAt: expect.any(Date) }),
+    })
+    expect(sendAppointmentAutoCancelled).toHaveBeenCalledWith(
+      'ana@test.com',
+      expect.objectContaining({ clientName: 'Ana', serviceName: 'Primera visita' }),
+    )
+  })
+
+  it('does not cancel or email when there are no overdue appointments', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    prismaMock.appointment.findMany.mockResolvedValue([])
+
+    await autoCancelUnpaidAppointments()
+
+    expect(prismaMock.appointment.update).not.toHaveBeenCalled()
+    expect(sendAppointmentAutoCancelled).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when the professional cannot be found', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(null)
+
+    await autoCancelUnpaidAppointments()
 
     expect(prismaMock.appointment.findMany).not.toHaveBeenCalled()
   })
