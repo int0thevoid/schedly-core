@@ -209,3 +209,71 @@ describe('PATCH /api/admin/clients/:id', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('GET /api/admin/clients/:id/stats', () => {
+  it('returns 401 without auth', async () => {
+    const res = await request(app).get('/api/admin/clients/c1/stats')
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 404 when client not found', async () => {
+    prismaMock.client.findUnique.mockResolvedValue(null)
+    const res = await request(app)
+      .get('/api/admin/clients/does-not-exist/stats')
+      .set('Authorization', token())
+    expect(res.status).toBe(404)
+  })
+
+  it('returns zeros when client has no appointments', async () => {
+    prismaMock.client.findUnique.mockResolvedValue({ ...CLIENT, createdAt: new Date('2026-01-01T00:00:00Z') })
+    prismaMock.appointment.findMany.mockResolvedValue([])
+    const res = await request(app)
+      .get('/api/admin/clients/c1/stats')
+      .set('Authorization', token())
+    expect(res.status).toBe(200)
+    expect(res.body.data).toMatchObject({
+      lastAppointment: null,
+      totalCompleted: 0,
+      totalCancelled: 0,
+      servicesUsed: [],
+    })
+  })
+
+  it('returns correct stats when appointments exist', async () => {
+    prismaMock.client.findUnique.mockResolvedValue({ ...CLIENT, createdAt: new Date('2026-01-01T00:00:00Z') })
+    prismaMock.appointment.findMany.mockResolvedValue([
+      {
+        id: 'a1',
+        startDateTime: new Date('2026-06-15T10:00:00Z'),
+        status: 'confirmed',
+        outcome: 'attended',
+        service: { name: 'Primera visita' },
+      },
+      {
+        id: 'a2',
+        startDateTime: new Date('2026-05-10T10:00:00Z'),
+        status: 'cancelled',
+        outcome: null,
+        service: { name: 'Terapia individual' },
+      },
+      {
+        id: 'a3',
+        startDateTime: new Date('2026-04-01T10:00:00Z'),
+        status: 'confirmed',
+        outcome: 'attended',
+        service: { name: 'Primera visita' },
+      },
+    ])
+    const res = await request(app)
+      .get('/api/admin/clients/c1/stats')
+      .set('Authorization', token())
+    expect(res.status).toBe(200)
+    expect(res.body.data).toMatchObject({
+      lastAppointment: '2026-06-15T10:00:00.000Z',
+      totalCompleted: 2,
+      totalCancelled: 1,
+    })
+    expect(res.body.data.servicesUsed).toEqual(expect.arrayContaining(['Primera visita', 'Terapia individual']))
+    expect(res.body.data.servicesUsed).toHaveLength(2)
+  })
+})
