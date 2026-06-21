@@ -70,6 +70,30 @@ export async function getClient(req: Request, res: Response): Promise<void> {
   ok(res, client)
 }
 
+export async function getClientStats(req: Request, res: Response): Promise<void> {
+  const { id } = req.params
+  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+
+  const client = await prisma.client.findUnique({ where: { id }, select: { email: true } })
+  if (!client) {
+    fail(res, 'Cliente no encontrado', 404)
+    return
+  }
+
+  const appointments = await prisma.appointment.findMany({
+    where: { clientEmail: client.email, professionalId },
+    select: { startDateTime: true, status: true, outcome: true, service: { select: { name: true } } },
+    orderBy: { startDateTime: 'desc' },
+  })
+
+  const lastAppointment = appointments[0]?.startDateTime?.toISOString() ?? null
+  const totalCompleted = appointments.filter((a) => a.outcome === 'attended').length
+  const totalCancelled = appointments.filter((a) => a.status === 'cancelled').length
+  const servicesUsed = [...new Set(appointments.map((a) => a.service.name))]
+
+  ok(res, { lastAppointment, totalCompleted, totalCancelled, servicesUsed })
+}
+
 export async function updateClient(req: Request, res: Response): Promise<void> {
   const { id } = req.params
   const parsed = updateSchema.safeParse(req.body)
