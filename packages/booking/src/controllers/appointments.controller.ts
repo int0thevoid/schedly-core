@@ -17,7 +17,16 @@ const createSchema = z.object({
   notes: z.string().optional(),
   saveClientData: z.boolean().optional(),
   rut: z.string().optional(),
+  paymentMethod: z.enum(['transfer', 'cash']).optional(),
 })
+
+function isSameCalendarDay(a: Date, b: Date): boolean {
+  return (
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate()
+  )
+}
 
 const cancelSchema = z.object({
   reason: z.string().optional(),
@@ -32,7 +41,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
     return
   }
 
-  const { serviceId, startDateTime, modality, clientName, clientEmail, clientPhone, notes, saveClientData, rut } =
+  const { serviceId, startDateTime, modality, clientName, clientEmail, clientPhone, notes, saveClientData, rut, paymentMethod } =
     parsed.data
   const professionalId = process.env.PROFESSIONAL_ID ?? ''
 
@@ -44,6 +53,13 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
 
   const start = new Date(startDateTime)
   const end = new Date(start.getTime() + service.duration * 60_000)
+  const now = new Date()
+  const bookingFlow = isSameCalendarDay(start, now) ? 'same_day' : 'advance'
+  const paymentDeadline = bookingFlow === 'same_day'
+    ? end
+    : new Date(now.getTime() + 24 * 60 * 60 * 1000)
+
+  const isCash = paymentMethod === 'cash'
 
   try {
     const appointment = await prisma.$transaction(async (tx) => {
@@ -76,8 +92,12 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
           endDateTime: end,
           modality,
           notes,
-          status: 'pending',
-          paymentStatus: 'unpaid',
+          status: isCash ? 'confirmed' : 'pending',
+          paymentStatus: isCash ? 'paid' : 'unpaid',
+          paymentMethod: paymentMethod ?? null,
+          paymentAmount: isCash ? service.price : null,
+          bookingFlow,
+          paymentDeadline,
         },
       })
     })

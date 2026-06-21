@@ -5,6 +5,7 @@ import { paymentReminderTemplate, type PaymentReminderData } from './templates/p
 import { reviewRequestTemplate, type ReviewRequestData } from './templates/review-request.js'
 import { dailyDigestTemplate, type DailyDigestData } from './templates/daily-digest.js'
 import { appointmentCancelledTemplate, type AppointmentCancelledData } from './templates/appointment-cancelled.js'
+import { appointmentAutoCancelledTemplate, type AppointmentAutoCancelledData } from './templates/appointment-auto-cancelled.js'
 
 export class EmailService {
   private resend: Resend
@@ -42,6 +43,11 @@ export class EmailService {
 
   async sendAppointmentCancelled(to: string, data: AppointmentCancelledData): Promise<void> {
     const { subject, html } = appointmentCancelledTemplate(data)
+    await this.send(to, subject, html)
+  }
+
+  async sendAppointmentAutoCancelled(to: string, data: AppointmentAutoCancelledData): Promise<void> {
+    const { subject, html } = appointmentAutoCancelledTemplate(data)
     await this.send(to, subject, html)
   }
 

@@ -1,4 +1,5 @@
 import type {
+  AppointmentAutoCancelledData,
   AppointmentCancelledData,
   AppointmentConfirmationData,
   AppointmentReminderData,
@@ -165,6 +166,17 @@ export function buildDailyDigestData(
 }
 
 export function buildAppointmentCancelledData(appointment: AppointmentWithService, professional: Professional): AppointmentCancelledData {
+  return {
+    clientName: appointment.clientName,
+    serviceName: appointment.service.name,
+    date: formatAppointmentDate(appointment.startDateTime, professional.timezone),
+    time: formatAppointmentTimeRange(appointment.startDateTime, appointment.endDateTime, professional.timezone),
+    professionalName: professional.name,
+    professionalPhone: professional.phone ?? '',
+  }
+}
+
+export function buildAppointmentAutoCancelledData(appointment: AppointmentWithService, professional: Professional): AppointmentAutoCancelledData {
   return {
     clientName: appointment.clientName,
     serviceName: appointment.service.name,

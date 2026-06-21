@@ -1,6 +1,7 @@
 import { EmailService, getAppointmentsNeedingReminder, type AppointmentForReminder } from '@schedly/notifications'
 import { prisma } from '../lib/prisma.js'
 import {
+  buildAppointmentAutoCancelledData,
   buildAppointmentReminderData,
   buildDailyDigestData,
   buildPaymentReminderData,
@@ -92,6 +93,45 @@ export async function runNotificationsJob(): Promise<void> {
   }
 
   await sendDailyDigestIfNeeded(professional, emailService)
+}
+
+/**
+ * Cancela automáticamente las citas pendientes cuyo plazo de pago ya venció
+ * (paymentDeadline < now) y envía un email al cliente explicando la anulación.
+ */
+export async function autoCancelUnpaidAppointments(): Promise<void> {
+  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professional = await prisma.professional.findUnique({ where: { id: professionalId } })
+  if (!professional) return
+
+  const now = new Date()
+
+  const overdue = await prisma.appointment.findMany({
+    where: {
+      professionalId,
+      status: 'pending',
+      paymentStatus: 'unpaid',
+      paymentDeadline: { lt: now },
+    },
+    include: { service: true },
+  })
+
+  const emailService = new EmailService()
+
+  for (const appointment of overdue) {
+    try {
+      await prisma.appointment.update({
+        where: { id: appointment.id },
+        data: { status: 'cancelled', autoCancelledAt: now },
+      })
+      await emailService.sendAppointmentAutoCancelled(
+        appointment.clientEmail,
+        buildAppointmentAutoCancelledData(appointment as AppointmentWithService, professional),
+      )
+    } catch (err) {
+      console.error(`[notifications] failed to auto-cancel appointment ${appointment.id}`, err)
+    }
+  }
 }
 
 /**

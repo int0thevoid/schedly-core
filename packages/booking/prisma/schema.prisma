@@ -32,6 +32,8 @@ model Professional {
   transferAccountNumber String?
   transferEmail         String?
 
+  cashPaymentEnabled Boolean @default(true)
+
   services        Service[]
   weeklySchedules WeeklySchedule[]
   scheduleBlocks  ScheduleBlock[]
@@ -106,6 +108,10 @@ model Appointment {
   paymentStatus  String  @default("unpaid")
   paymentAmount  Int?
   paymentMethod  String?
+
+  bookingFlow      String    @default("advance")
+  paymentDeadline  DateTime?
+  autoCancelledAt  DateTime?
 
   attended Boolean?
 

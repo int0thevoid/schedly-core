@@ -6,6 +6,7 @@ import { reviewRequestTemplate, type ReviewRequestData } from '../templates/revi
 import { confirmAttendancePageTemplate } from '../templates/confirm-attendance-page.js'
 import { dailyDigestTemplate, type DailyDigestData } from '../templates/daily-digest.js'
 import { appointmentCancelledTemplate, type AppointmentCancelledData } from '../templates/appointment-cancelled.js'
+import { appointmentAutoCancelledTemplate, type AppointmentAutoCancelledData } from '../templates/appointment-auto-cancelled.js'
 
 const TRANSFER_DATA = {
   rut: '12.345.678-9',
@@ -265,6 +266,39 @@ describe('appointmentCancelledTemplate', () => {
 
   it('escapes HTML in client-provided fields', () => {
     const { html } = appointmentCancelledTemplate({ ...baseData, clientName: '<script>alert(1)</script>' })
+    expect(html).not.toContain('<script>alert(1)</script>')
+    expect(html).toContain('&lt;script&gt;')
+  })
+})
+
+describe('appointmentAutoCancelledTemplate', () => {
+  const baseData: AppointmentAutoCancelledData = {
+    clientName: 'Ana Pérez',
+    serviceName: 'Primera visita',
+    date: 'Martes 10 de junio de 2026',
+    time: '14:00 - 14:45',
+    professionalName: 'Ps. Stefany Osorio',
+    professionalPhone: '+56966898588',
+  }
+
+  it('returns a subject indicating auto-cancellation', () => {
+    const { subject } = appointmentAutoCancelledTemplate(baseData)
+    expect(subject).toBe('❌ Tu reserva fue anulada — Primera visita el Martes 10 de junio de 2026')
+  })
+
+  it('body explains the reservation was cancelled due to non-payment', () => {
+    const { html } = appointmentAutoCancelledTemplate(baseData)
+    expect(html).toContain('anulada')
+    expect(html).toContain('pago')
+  })
+
+  it('includes instructions to reschedule', () => {
+    const { html } = appointmentAutoCancelledTemplate(baseData)
+    expect(html).toContain('reagendar')
+  })
+
+  it('escapes HTML in client-provided fields', () => {
+    const { html } = appointmentAutoCancelledTemplate({ ...baseData, clientName: '<script>alert(1)</script>' })
     expect(html).not.toContain('<script>alert(1)</script>')
     expect(html).toContain('&lt;script&gt;')
   })
