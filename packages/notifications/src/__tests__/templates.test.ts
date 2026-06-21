@@ -28,9 +28,14 @@ describe('appointmentConfirmationTemplate', () => {
     professionalPhone: '+56966898588',
   }
 
-  it('returns a subject including the service name and date', () => {
+  it('returns a subject indicating the booking was received (not yet confirmed)', () => {
     const { subject } = appointmentConfirmationTemplate(baseData)
-    expect(subject).toBe('✅ Cita confirmada — Primera visita el Martes 10 de junio de 2026')
+    expect(subject).toBe('📋 Reserva recibida — Primera visita el Martes 10 de junio de 2026')
+  })
+
+  it('body explains that payment is required to confirm the appointment', () => {
+    const { html } = appointmentConfirmationTemplate(baseData)
+    expect(html).toContain('pendiente')
   })
 
   it('includes a Google Maps link for presential appointments', () => {
@@ -61,6 +66,11 @@ describe('appointmentConfirmationTemplate', () => {
     const { html } = appointmentConfirmationTemplate({ ...baseData, clientName: '<script>alert(1)</script>' })
     expect(html).not.toContain('<script>alert(1)</script>')
     expect(html).toContain('&lt;script&gt;')
+  })
+
+  it('HTML contiene word-break:break-all para evitar overflow en mobile con URLs largas', () => {
+    const { html } = appointmentConfirmationTemplate({ ...baseData, transferData: TRANSFER_DATA })
+    expect(html).toContain('word-break:break-all')
   })
 
   it('includes the professional phone in the footer', () => {
