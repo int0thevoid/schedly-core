@@ -44,25 +44,27 @@ function renderLocation(data: AppointmentConfirmationData): string {
 }
 
 function renderTransferData(transferData: TransferData, price: number): string {
+  const dataCellStyle = `word-wrap:break-word;overflow-wrap:break-word;word-break:break-all;max-width:100%;padding:4px 0;font-weight:600;`
   return `
     <div style="background-color:${COLORS.accentFaint};border-radius:8px;padding:20px;margin-bottom:8px;">
       <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 12px;font-size:15px;font-weight:600;color:${COLORS.text};">Datos para transferencia (${formatCLP(price)})</p>
-      <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px;">
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};width:140px;">RUT</td><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;font-weight:600;">${escapeHtml(transferData.rut)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">Banco</td><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;font-weight:600;">${escapeHtml(transferData.bank)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">Tipo de cuenta</td><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;font-weight:600;">${escapeHtml(transferData.accountType)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">N° de cuenta</td><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;font-weight:600;">${escapeHtml(transferData.accountNumber)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">Email</td><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;font-weight:600;">${escapeHtml(transferData.email)}</td></tr>
+      <table role="presentation" style="width:100%;max-width:600px;border-collapse:collapse;font-size:14px;table-layout:fixed;">
+        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};width:140px;">RUT</td><td style="${dataCellStyle}">${escapeHtml(transferData.rut)}</td></tr>
+        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">Banco</td><td style="${dataCellStyle}">${escapeHtml(transferData.bank)}</td></tr>
+        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">Tipo de cuenta</td><td style="${dataCellStyle}">${escapeHtml(transferData.accountType)}</td></tr>
+        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">N° de cuenta</td><td style="${dataCellStyle}">${escapeHtml(transferData.accountNumber)}</td></tr>
+        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">Email</td><td style="${dataCellStyle}">${escapeHtml(transferData.email)}</td></tr>
       </table>
     </div>`
 }
 
 export function appointmentConfirmationTemplate(data: AppointmentConfirmationData): EmailTemplate {
-  const subject = `✅ Cita confirmada — ${data.serviceName} el ${data.date}`
+  const subject = `📋 Reserva recibida — ${data.serviceName} el ${data.date}`
 
   const bodyHtml = `
     <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 16px;font-size:16px;">¡Hola ${escapeHtml(data.clientName)}!</p>
-    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 24px;font-size:16px;">Tu cita ha sido agendada. Aquí los detalles:</p>
+    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 8px;font-size:16px;">Tu reserva ha sido recibida. Aquí los detalles:</p>
+    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Tu cita quedará <strong>pendiente</strong> hasta que confirmemos el pago. Recibirás una notificación una vez confirmada.</p>
 
     <div style="background-color:${COLORS.primaryFaint};border-radius:8px;padding:20px;margin-bottom:24px;">
       <table role="presentation" style="width:100%;border-collapse:collapse;font-size:15px;">
