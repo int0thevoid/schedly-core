@@ -113,6 +113,8 @@ model Appointment {
   paymentDeadline  DateTime?
   autoCancelledAt  DateTime?
 
+  outcome String?
+
   attended Boolean?
 
   attendanceConfirmed   Boolean   @default(false)

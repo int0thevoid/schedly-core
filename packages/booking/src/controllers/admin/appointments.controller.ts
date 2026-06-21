@@ -48,6 +48,10 @@ const attendanceSchema = z.object({
   attended: z.boolean(),
 })
 
+const outcomeSchema = z.object({
+  outcome: z.enum(['attended', 'no_show']).nullable(),
+})
+
 export async function listWeeklyAppointments(req: Request, res: Response): Promise<void> {
   const parsed = weeklySchema.safeParse(req.query)
   if (!parsed.success) {
@@ -232,6 +236,25 @@ export async function updateAppointmentAttendance(req: Request, res: Response): 
   const updated = await prisma.appointment.update({
     where: { id },
     data: { attended: parsed.data.attended },
+  })
+  ok(res, updated)
+}
+
+export async function updateAppointmentOutcome(req: Request, res: Response): Promise<void> {
+  const parsed = outcomeSchema.safeParse(req.body)
+  if (!parsed.success) {
+    fail(res, parsed.error.issues[0]?.message ?? 'Invalid body', 400)
+    return
+  }
+  const { id } = req.params
+  const appointment = await prisma.appointment.findUnique({ where: { id } })
+  if (!appointment) {
+    fail(res, 'Appointment not found', 404)
+    return
+  }
+  const updated = await prisma.appointment.update({
+    where: { id },
+    data: { outcome: parsed.data.outcome },
   })
   ok(res, updated)
 }

@@ -503,3 +503,57 @@ describe('POST /api/admin/appointments/:id/notify-payment', () => {
     expect(res.status).toBe(502)
   })
 })
+
+describe('PATCH /api/admin/appointments/:id/outcome', () => {
+  it('updates outcome and returns the appointment', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, outcome: 'attended' })
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/outcome')
+      .set('Authorization', token())
+      .send({ outcome: 'attended' })
+
+    expect(res.status).toBe(200)
+    expect(prismaMock.appointment.update).toHaveBeenCalledWith({
+      where: { id: 'a1' },
+      data: { outcome: 'attended' },
+    })
+  })
+
+  it('allows clearing the outcome by sending null', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue({ ...APT, outcome: 'attended' })
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, outcome: null })
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/outcome')
+      .set('Authorization', token())
+      .send({ outcome: null })
+
+    expect(res.status).toBe(200)
+    expect(prismaMock.appointment.update).toHaveBeenCalledWith({
+      where: { id: 'a1' },
+      data: { outcome: null },
+    })
+  })
+
+  it('returns 400 for invalid outcome values', async () => {
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/outcome')
+      .set('Authorization', token())
+      .send({ outcome: 'invalid_outcome' })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 404 when appointment not found', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(null)
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/bad/outcome')
+      .set('Authorization', token())
+      .send({ outcome: 'attended' })
+
+    expect(res.status).toBe(404)
+  })
+})
