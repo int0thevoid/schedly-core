@@ -4,9 +4,8 @@ import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
 import { getEmailService } from '../../lib/email-service.js'
 import {
-  buildAppointmentCancelledData,
+  buildAppointmentCancelledByPatientData,
   buildAppointmentConfirmationData,
-  buildPaymentReminderData,
   type AppointmentWithService,
 } from '../../lib/notification-data.js'
 import { dayRangeInTZ, todayInTZ } from '../../lib/date.js'
@@ -179,17 +178,16 @@ export async function updateAppointmentStatus(req: Request, res: Response): Prom
   ok(res, updated)
 
   if (parsed.data.status === 'cancelled') {
-    void sendCancellationEmail(appointment)
+    void sendCancellationEmail(appointment as AppointmentWithService)
   }
 }
 
-/** Envía el correo de cancelación al cliente. Best-effort: un fallo se registra pero no afecta la respuesta ya enviada. */
 async function sendCancellationEmail(appointment: AppointmentWithService): Promise<void> {
   try {
     const professional = await prisma.professional.findUnique({ where: { id: appointment.professionalId } })
     if (!professional) return
-    const data = buildAppointmentCancelledData(appointment, professional)
-    await getEmailService().sendAppointmentCancelled(appointment.clientEmail, data)
+    const data = buildAppointmentCancelledByPatientData(appointment, professional)
+    await getEmailService().sendAppointmentCancelledByPatient(appointment.clientEmail, data)
   } catch (err) {
     console.error(`[notifications] failed to send cancellation email for appointment ${appointment.id}`, err)
   }
@@ -291,43 +289,3 @@ export async function notifyAppointmentConfirmation(req: Request, res: Response)
   ok(res, { sent: true })
 }
 
-/** Envía un recordatorio de pago pendiente (reutiliza el template payment-reminder). */
-export async function notifyPaymentPending(req: Request, res: Response): Promise<void> {
-  const { id } = req.params
-  const appointment = await prisma.appointment.findUnique({ where: { id } })
-  if (!appointment) {
-    fail(res, 'Appointment not found', 404)
-    return
-  }
-  if (appointment.paymentStatus !== 'unpaid') {
-    fail(res, 'Appointment is already paid', 400)
-    return
-  }
-
-  const service = await prisma.service.findUnique({ where: { id: appointment.serviceId } })
-  if (!service) {
-    fail(res, 'Service not found', 404)
-    return
-  }
-
-  const professional = await prisma.professional.findUnique({ where: { id: appointment.professionalId } })
-  if (!professional) {
-    fail(res, 'Professional not found', 404)
-    return
-  }
-
-  const data = buildPaymentReminderData({ ...appointment, service }, professional)
-  if (!data) {
-    fail(res, 'Transfer data not configured', 400)
-    return
-  }
-
-  try {
-    await getEmailService().sendPaymentReminder(appointment.clientEmail, data)
-  } catch (err) {
-    console.error(`[notifications] failed to send payment reminder for appointment ${id}`, err)
-    fail(res, 'Failed to send email', 502)
-    return
-  }
-  ok(res, { sent: true })
-}

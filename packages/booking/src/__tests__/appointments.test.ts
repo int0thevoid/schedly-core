@@ -22,6 +22,8 @@ const APPOINTMENT = {
   paymentAmount: null, paymentMethod: null, notes: null,
   bookingFlow: 'advance', paymentDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
   autoCancelledAt: null, attendanceConfirmed: false, attendanceConfirmedAt: null,
+  appointmentToken: 'tok_abc123',
+  tokenExpiresAt: new Date('2026-12-14T23:00:00Z'),
   createdAt: new Date(), updatedAt: new Date(),
 }
 
@@ -270,6 +272,157 @@ describe('PATCH /api/appointments/:id/cancel', () => {
     prismaMock.appointment.findUnique.mockResolvedValue({ ...APPOINTMENT, status: 'cancelled' })
     const res = await request(app).patch('/api/appointments/apt1/cancel').send({})
     expect(res.status).toBe(400)
+  })
+})
+
+describe('GET /api/appointments/token/:token', () => {
+  it('returns appointment data for a valid non-expired token', async () => {
+    const future = new Date(Date.now() + 2 * 60 * 60 * 1000)
+    const apt = {
+      ...APPOINTMENT,
+      status: 'pending',
+      appointmentToken: 'tok_valid',
+      tokenExpiresAt: future,
+      service: { name: 'Sesión' },
+    }
+    prismaMock.appointment.findUnique.mockResolvedValue(apt)
+
+    const res = await request(app).get('/api/appointments/token/tok_valid')
+    expect(res.status).toBe(200)
+    expect(res.body.data.isExpired).toBe(false)
+    expect(res.body.data.clientName).toBe('Ana')
+  })
+
+  it('returns isExpired=true when tokenExpiresAt is in the past', async () => {
+    const past = new Date(Date.now() - 1000)
+    const apt = {
+      ...APPOINTMENT,
+      appointmentToken: 'tok_expired',
+      tokenExpiresAt: past,
+      service: { name: 'Sesión' },
+    }
+    prismaMock.appointment.findUnique.mockResolvedValue(apt)
+
+    const res = await request(app).get('/api/appointments/token/tok_expired')
+    expect(res.status).toBe(200)
+    expect(res.body.data.isExpired).toBe(true)
+  })
+
+  it('returns 404 for an invalid token', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(null)
+    const res = await request(app).get('/api/appointments/token/tok_nonexistent')
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('PATCH /api/appointments/token/:token/cancel', () => {
+  it('cancels the appointment when token is valid and not expired', async () => {
+    const future = new Date(Date.now() + 2 * 60 * 60 * 1000)
+    const apt = {
+      ...APPOINTMENT,
+      status: 'pending',
+      appointmentToken: 'tok_valid',
+      tokenExpiresAt: future,
+      service: { name: 'Sesión' },
+    }
+    prismaMock.appointment.findUnique.mockResolvedValue(apt)
+    prismaMock.appointment.update.mockResolvedValue({ ...apt, status: 'cancelled' })
+    prismaMock.professional.findUnique.mockResolvedValue({ id: 'pro1', name: 'Ps. Stefany', email: 'stefany@test.com', phone: '+56966898588', timezone: 'UTC' })
+
+    const res = await request(app).patch('/api/appointments/token/tok_valid/cancel')
+    expect(res.status).toBe(200)
+    expect(res.body.data.success).toBe(true)
+    expect(prismaMock.appointment.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
+    )
+  })
+
+  it('returns 410 when token is expired', async () => {
+    const past = new Date(Date.now() - 1000)
+    const apt = { ...APPOINTMENT, appointmentToken: 'tok_expired', tokenExpiresAt: past, service: { name: 'Sesión' } }
+    prismaMock.appointment.findUnique.mockResolvedValue(apt)
+
+    const res = await request(app).patch('/api/appointments/token/tok_expired/cancel')
+    expect(res.status).toBe(410)
+  })
+
+  it('returns 404 for an invalid token', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue(null)
+    const res = await request(app).patch('/api/appointments/token/tok_bad/cancel')
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('PATCH /api/appointments/token/:token/reschedule', () => {
+  it('creates new appointment and cancels original when token is valid', async () => {
+    const future = new Date(Date.now() + 2 * 60 * 60 * 1000)
+    const apt = {
+      ...APPOINTMENT,
+      status: 'pending',
+      appointmentToken: 'tok_valid',
+      tokenExpiresAt: future,
+      service: SERVICE,
+    }
+    prismaMock.appointment.findUnique.mockResolvedValue(apt)
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    const newApt = { ...APPOINTMENT, id: 'apt2', appointmentToken: 'tok_new', startDateTime: new Date('2026-12-20T14:00:00Z') }
+    prismaMock.appointment.create.mockResolvedValue(newApt)
+    prismaMock.appointment.update.mockResolvedValue({ ...apt, status: 'cancelled' })
+    prismaMock.professional.findUnique.mockResolvedValue({ id: 'pro1', name: 'Ps. Stefany', email: 'stefany@test.com', phone: '+56966898588', timezone: 'UTC' })
+
+    const res = await request(app).patch('/api/appointments/token/tok_valid/reschedule').send({
+      newStartDateTime: '2026-12-20T14:00:00Z',
+    })
+    expect(res.status).toBe(200)
+    expect(prismaMock.appointment.create).toHaveBeenCalled()
+    expect(prismaMock.appointment.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'apt1' }, data: expect.objectContaining({ status: 'cancelled' }) }),
+    )
+  })
+
+  it('returns 410 when token is expired', async () => {
+    const past = new Date(Date.now() - 1000)
+    const apt = { ...APPOINTMENT, appointmentToken: 'tok_expired', tokenExpiresAt: past, service: SERVICE }
+    prismaMock.appointment.findUnique.mockResolvedValue(apt)
+
+    const res = await request(app).patch('/api/appointments/token/tok_expired/reschedule').send({
+      newStartDateTime: '2026-12-20T14:00:00Z',
+    })
+    expect(res.status).toBe(410)
+  })
+
+  it('returns 409 when new slot is taken', async () => {
+    const future = new Date(Date.now() + 2 * 60 * 60 * 1000)
+    const apt = { ...APPOINTMENT, appointmentToken: 'tok_valid', tokenExpiresAt: future, service: SERVICE }
+    prismaMock.appointment.findUnique.mockResolvedValue(apt)
+    prismaMock.$transaction.mockRejectedValue(new Error('SLOT_TAKEN'))
+
+    const res = await request(app).patch('/api/appointments/token/tok_valid/reschedule').send({
+      newStartDateTime: '2026-12-20T14:00:00Z',
+    })
+    expect(res.status).toBe(409)
+  })
+})
+
+describe('POST /api/appointments — token generation', () => {
+  it('stores appointmentToken and tokenExpiresAt at 23:00 the day before', async () => {
+    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+    await request(app).post('/api/appointments').send(VALID_BODY)
+
+    const createCall = prismaMock.appointment.create.mock.calls[0][0]
+    expect(createCall.data.appointmentToken).toBeDefined()
+    const expires = createCall.data.tokenExpiresAt as Date
+    const start = new Date('2026-12-15T14:00:00Z')
+    const dayBefore = new Date(start)
+    dayBefore.setUTCDate(dayBefore.getUTCDate() - 1)
+    expect(expires.getUTCDate()).toBe(dayBefore.getUTCDate())
+    expect(expires.getUTCHours()).toBe(23)
+    expect(expires.getUTCMinutes()).toBe(0)
   })
 })
 

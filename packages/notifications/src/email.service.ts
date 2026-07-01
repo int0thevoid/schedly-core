@@ -1,11 +1,12 @@
 import { Resend } from 'resend'
 import { appointmentConfirmationTemplate, type AppointmentConfirmationData } from './templates/appointment-confirmation.js'
 import { appointmentReminderTemplate, type AppointmentReminderData } from './templates/appointment-reminder.js'
-import { paymentReminderTemplate, type PaymentReminderData } from './templates/payment-reminder.js'
+import { professionalNewBookingTemplate, type ProfessionalNewBookingData } from './templates/professional-new-booking.js'
+import { appointmentModifiedTemplate, type AppointmentModifiedData } from './templates/appointment-modified.js'
+import { appointmentCancelledByPatientTemplate, type AppointmentCancelledByPatientData } from './templates/appointment-cancelled-by-patient.js'
+import { professionalCancellationNoticeTemplate, type ProfessionalCancellationNoticeData } from './templates/professional-cancellation-notice.js'
 import { reviewRequestTemplate, type ReviewRequestData } from './templates/review-request.js'
 import { dailyDigestTemplate, type DailyDigestData } from './templates/daily-digest.js'
-import { appointmentCancelledTemplate, type AppointmentCancelledData } from './templates/appointment-cancelled.js'
-import { appointmentAutoCancelledTemplate, type AppointmentAutoCancelledData } from './templates/appointment-auto-cancelled.js'
 
 export class EmailService {
   private resend: Resend
@@ -26,8 +27,23 @@ export class EmailService {
     await this.send(to, subject, html)
   }
 
-  async sendPaymentReminder(to: string, data: PaymentReminderData): Promise<void> {
-    const { subject, html } = paymentReminderTemplate(data)
+  async sendNewBookingToProfessional(to: string, data: ProfessionalNewBookingData): Promise<void> {
+    const { subject, html } = professionalNewBookingTemplate(data)
+    await this.send(to, subject, html)
+  }
+
+  async sendAppointmentModified(to: string, data: AppointmentModifiedData): Promise<void> {
+    const { subject, html } = appointmentModifiedTemplate(data)
+    await this.send(to, subject, html)
+  }
+
+  async sendAppointmentCancelledByPatient(to: string, data: AppointmentCancelledByPatientData): Promise<void> {
+    const { subject, html } = appointmentCancelledByPatientTemplate(data)
+    await this.send(to, subject, html)
+  }
+
+  async sendProfessionalCancellationNotice(to: string, data: ProfessionalCancellationNoticeData): Promise<void> {
+    const { subject, html } = professionalCancellationNoticeTemplate(data)
     await this.send(to, subject, html)
   }
 
@@ -38,16 +54,6 @@ export class EmailService {
 
   async sendDailyDigest(to: string, data: DailyDigestData): Promise<void> {
     const { subject, html } = dailyDigestTemplate(data)
-    await this.send(to, subject, html)
-  }
-
-  async sendAppointmentCancelled(to: string, data: AppointmentCancelledData): Promise<void> {
-    const { subject, html } = appointmentCancelledTemplate(data)
-    await this.send(to, subject, html)
-  }
-
-  async sendAppointmentAutoCancelled(to: string, data: AppointmentAutoCancelledData): Promise<void> {
-    const { subject, html } = appointmentAutoCancelledTemplate(data)
     await this.send(to, subject, html)
   }
 

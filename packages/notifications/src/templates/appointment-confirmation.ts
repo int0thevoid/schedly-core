@@ -1,84 +1,66 @@
-import { COLORS, confirmAttendanceButton, contactFooter, escapeHtml, formatCLP, googleMapsLink, renderLayout, type EmailTemplate } from './layout.js'
-
-export interface TransferData {
-  rut: string
-  bank: string
-  accountType: string
-  accountNumber: string
-  email: string
-}
+import { COLORS, contactFooter, escapeHtml, formatCLP, googleMapsLink, renderLayout, type EmailTemplate } from './layout.js'
 
 export interface AppointmentConfirmationData {
   clientName: string
   serviceName: string
   date: string
-  time: string
+  startTime: string
+  endTime: string
   modality: 'presential' | 'online'
   address?: string
-  meetLink?: string
   price: number
   professionalName: string
   professionalPhone: string
-  transferData?: TransferData
-  confirmAttendanceUrl?: string
+  modifyUrl: string
+  cancelUrl: string
+  googleCalendarUrl: string
 }
 
 function renderLocation(data: AppointmentConfirmationData): string {
-  if (data.modality === 'presential') {
-    if (!data.address) return ''
+  if (data.modality === 'presential' && data.address) {
     return `
-      <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 4px;font-size:15px;">📍 <strong>Ubicación:</strong> ${escapeHtml(data.address)}</p>
-      <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 24px;font-size:14px;">
+      <p style="margin:0 0 4px;font-size:15px;">📍 <strong>Ubicación:</strong> ${escapeHtml(data.address)}</p>
+      <p style="margin:0 0 24px;font-size:14px;">
         <a href="${googleMapsLink(data.address)}" style="color:${COLORS.primary};text-decoration:underline;">Ver en Google Maps</a>
       </p>`
   }
-
-  const meetLinkHtml = data.meetLink
-    ? `<p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:8px 0 0;font-size:14px;"><a href="${escapeHtml(data.meetLink)}" style="color:${COLORS.primary};text-decoration:underline;">Unirse a la videollamada</a></p>`
-    : ''
-
-  return `
-    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 24px;font-size:15px;">
-      💻 Recibirás el link de videollamada próximamente.${meetLinkHtml}
-    </p>`
+  return `<p style="margin:0 0 24px;font-size:15px;">💻 Sesión online. Recibirás el link de videollamada próximamente.</p>`
 }
 
-function renderTransferData(transferData: TransferData, price: number): string {
-  const dataCellStyle = `word-wrap:break-word;overflow-wrap:break-word;word-break:break-all;max-width:100%;padding:4px 0;font-weight:600;`
+function renderActionButtons(data: AppointmentConfirmationData): string {
   return `
-    <div style="background-color:${COLORS.accentFaint};border-radius:8px;padding:20px;margin-bottom:8px;">
-      <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 12px;font-size:15px;font-weight:600;color:${COLORS.text};">Datos para transferencia (${formatCLP(price)})</p>
-      <table role="presentation" style="width:100%;max-width:600px;border-collapse:collapse;font-size:14px;table-layout:fixed;">
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};width:140px;">RUT</td><td style="${dataCellStyle}">${escapeHtml(transferData.rut)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">Banco</td><td style="${dataCellStyle}">${escapeHtml(transferData.bank)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">Tipo de cuenta</td><td style="${dataCellStyle}">${escapeHtml(transferData.accountType)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">N° de cuenta</td><td style="${dataCellStyle}">${escapeHtml(transferData.accountNumber)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;color:${COLORS.muted};">Email</td><td style="${dataCellStyle}">${escapeHtml(transferData.email)}</td></tr>
-      </table>
+    <div style="margin:28px 0 0;text-align:center;">
+      <a href="${escapeHtml(data.modifyUrl)}" style="display:inline-block;background-color:${COLORS.primary};color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;margin:4px;">✏️ Modificar cita</a>
+      <a href="${escapeHtml(data.cancelUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.accent};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;margin:4px;border:1px solid ${COLORS.accent};">❌ Anular cita</a>
+    </div>
+    <div style="margin:12px 0 0;text-align:center;">
+      <a href="${escapeHtml(data.googleCalendarUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.primary};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;border:1px solid ${COLORS.primary};">📅 Agregar a Google Calendar</a>
     </div>`
 }
 
 export function appointmentConfirmationTemplate(data: AppointmentConfirmationData): EmailTemplate {
-  const subject = `📋 Reserva recibida — ${data.serviceName} el ${data.date}`
+  const subject = `📋 Tu cita ha sido agendada — ${data.serviceName} el ${data.date}`
 
   const bodyHtml = `
-    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 16px;font-size:16px;">¡Hola ${escapeHtml(data.clientName)}!</p>
-    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 8px;font-size:16px;">Tu reserva ha sido recibida. Aquí los detalles:</p>
-    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Tu cita quedará <strong>pendiente</strong> hasta que confirmemos el pago. Recibirás una notificación una vez confirmada.</p>
+    <p style="margin:0 0 16px;font-size:16px;">¡Hola ${escapeHtml(data.clientName)}!</p>
+    <p style="margin:0 0 24px;font-size:16px;">Tu cita ha sido agendada. Aquí los detalles:</p>
 
     <div style="background-color:${COLORS.primaryFaint};border-radius:8px;padding:20px;margin-bottom:24px;">
       <table role="presentation" style="width:100%;border-collapse:collapse;font-size:15px;">
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:6px 0;color:${COLORS.muted};width:120px;">Servicio</td><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:6px 0;font-weight:600;">${escapeHtml(data.serviceName)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:6px 0;color:${COLORS.muted};">Fecha</td><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:6px 0;font-weight:600;">${escapeHtml(data.date)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:6px 0;color:${COLORS.muted};">Hora</td><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:6px 0;font-weight:600;">${escapeHtml(data.time)}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:6px 0;color:${COLORS.muted};">Modalidad</td><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:6px 0;font-weight:600;">${data.modality === 'presential' ? 'Presencial' : 'Online'}</td></tr>
-        <tr><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:6px 0;color:${COLORS.muted};">Valor</td><td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:6px 0;font-weight:600;">${formatCLP(data.price)}</td></tr>
+        <tr><td style="padding:6px 0;color:${COLORS.muted};width:120px;">Servicio</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(data.serviceName)}</td></tr>
+        <tr><td style="padding:6px 0;color:${COLORS.muted};">Fecha</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(data.date)}</td></tr>
+        <tr><td style="padding:6px 0;color:${COLORS.muted};">Horario</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(data.startTime)} – ${escapeHtml(data.endTime)}</td></tr>
+        <tr><td style="padding:6px 0;color:${COLORS.muted};">Modalidad</td><td style="padding:6px 0;font-weight:600;">${data.modality === 'presential' ? 'Presencial' : 'Online'}</td></tr>
+        <tr><td style="padding:6px 0;color:${COLORS.muted};">Valor</td><td style="padding:6px 0;font-weight:600;">${formatCLP(data.price)}</td></tr>
       </table>
     </div>
 
     ${renderLocation(data)}
-    ${data.transferData ? renderTransferData(data.transferData, data.price) : ''}
-    ${data.confirmAttendanceUrl ? confirmAttendanceButton(data.confirmAttendanceUrl) : ''}
+
+    <p style="margin:0 0 8px;font-size:14px;color:${COLORS.muted};">Procura llegar unos minutos antes de tu sesión.</p>
+    <p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Puedes modificar o anular tu cita hasta las <strong>23:00 del día anterior</strong> a tu sesión.</p>
+
+    ${renderActionButtons(data)}
   `
 
   return {

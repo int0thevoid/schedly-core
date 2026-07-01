@@ -1,5 +1,12 @@
 import { COLORS, contactFooter, escapeHtml, formatCLP, renderLayout, whatsAppLink, type EmailTemplate } from './layout.js'
-import type { TransferData } from './appointment-confirmation.js'
+
+interface TransferData {
+  rut: string
+  bank: string
+  accountType: string
+  accountNumber: string
+  email: string
+}
 
 export interface PaymentReminderData {
   clientName: string
