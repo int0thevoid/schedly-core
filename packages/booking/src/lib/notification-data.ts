@@ -93,6 +93,8 @@ export function buildAppointmentConfirmationData(
     modifyUrl: buildTokenUrl(token, 'modificar'),
     cancelUrl: buildTokenUrl(token, 'anular'),
     googleCalendarUrl: buildGoogleCalendarUrl(appointment, professional),
+    startDateTime: appointment.startDateTime,
+    endDateTime: appointment.endDateTime,
   }
 }
 
@@ -110,6 +112,8 @@ export function buildAppointmentReminderData(
     modality,
     address: modality === 'presential' ? process.env.PROFESSIONAL_ADDRESS : undefined,
     googleCalendarUrl: buildGoogleCalendarUrl(appointment, professional),
+    startDateTime: appointment.startDateTime,
+    endDateTime: appointment.endDateTime,
   }
 }
 
@@ -155,6 +159,8 @@ export function buildAppointmentModifiedData(
     modifyUrl: buildTokenUrl(newToken, 'modificar'),
     cancelUrl: buildTokenUrl(newToken, 'anular'),
     googleCalendarUrl: buildGoogleCalendarUrl(newAppointment, professional),
+    newStartDateTime: newAppointment.startDateTime,
+    newEndDateTime: newAppointment.endDateTime,
   }
 }
 

@@ -7,6 +7,9 @@ import { appointmentCancelledByPatientTemplate, type AppointmentCancelledByPatie
 import { professionalCancellationNoticeTemplate, type ProfessionalCancellationNoticeData } from './templates/professional-cancellation-notice.js'
 import { reviewRequestTemplate, type ReviewRequestData } from './templates/review-request.js'
 import { dailyDigestTemplate, type DailyDigestData } from './templates/daily-digest.js'
+import { generateICSFile } from './utils/ics-generator.js'
+
+type Attachment = { filename: string; content: Buffer }
 
 export class EmailService {
   private resend: Resend
@@ -19,12 +22,24 @@ export class EmailService {
 
   async sendAppointmentConfirmation(to: string, data: AppointmentConfirmationData): Promise<void> {
     const { subject, html } = appointmentConfirmationTemplate(data)
-    await this.send(to, subject, html)
+    const ics = generateICSFile({
+      title: data.serviceName,
+      startDateTime: data.startDateTime,
+      endDateTime: data.endDateTime,
+      location: data.modality === 'presential' ? data.address : undefined,
+    })
+    await this.send(to, subject, html, [{ filename: 'cita.ics', content: ics }])
   }
 
   async sendAppointmentReminder(to: string, data: AppointmentReminderData): Promise<void> {
     const { subject, html } = appointmentReminderTemplate(data)
-    await this.send(to, subject, html)
+    const ics = generateICSFile({
+      title: data.serviceName,
+      startDateTime: data.startDateTime,
+      endDateTime: data.endDateTime,
+      location: data.modality === 'presential' ? data.address : undefined,
+    })
+    await this.send(to, subject, html, [{ filename: 'cita.ics', content: ics }])
   }
 
   async sendNewBookingToProfessional(to: string, data: ProfessionalNewBookingData): Promise<void> {
@@ -34,7 +49,13 @@ export class EmailService {
 
   async sendAppointmentModified(to: string, data: AppointmentModifiedData): Promise<void> {
     const { subject, html } = appointmentModifiedTemplate(data)
-    await this.send(to, subject, html)
+    const ics = generateICSFile({
+      title: data.newServiceName,
+      startDateTime: data.newStartDateTime,
+      endDateTime: data.newEndDateTime,
+      location: data.modality === 'presential' ? data.address : undefined,
+    })
+    await this.send(to, subject, html, [{ filename: 'cita.ics', content: ics }])
   }
 
   async sendAppointmentCancelledByPatient(to: string, data: AppointmentCancelledByPatientData): Promise<void> {
@@ -57,12 +78,13 @@ export class EmailService {
     await this.send(to, subject, html)
   }
 
-  private async send(to: string, subject: string, html: string): Promise<void> {
+  private async send(to: string, subject: string, html: string, attachments?: Attachment[]): Promise<void> {
     const { error } = await this.resend.emails.send({
       from: this.from,
       to,
       subject,
       html,
+      ...(attachments ? { attachments } : {}),
     })
 
     if (error) {

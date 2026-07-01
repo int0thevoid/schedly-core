@@ -10,6 +10,9 @@ vi.mock('resend', () => ({
 
 import { EmailService } from '../email.service.js'
 import type { ReviewRequestData } from '../templates/review-request.js'
+import type { AppointmentConfirmationData } from '../templates/appointment-confirmation.js'
+import type { AppointmentReminderData } from '../templates/appointment-reminder.js'
+import type { AppointmentModifiedData } from '../templates/appointment-modified.js'
 
 const REVIEW_DATA: ReviewRequestData = {
   clientName: 'Ana Pérez',
@@ -17,26 +20,78 @@ const REVIEW_DATA: ReviewRequestData = {
   professionalName: 'Ps. Stefany Osorio',
 }
 
-describe('EmailService', () => {
-  beforeEach(() => {
-    sendMock.mockReset()
-    process.env.RESEND_API_KEY = 're_test_key'
-    process.env.RESEND_FROM_EMAIL = 'noreply@mail.int0thesrv.cl'
-    process.env.RESEND_FROM_NAME = 'Ps. Stefany Osorio'
-  })
+const CONFIRMATION_DATA: AppointmentConfirmationData = {
+  clientName: 'Ana Pérez',
+  serviceName: 'Primera visita',
+  date: 'Miércoles, 15 de julio de 2026',
+  startTime: '10:00',
+  endTime: '10:45',
+  modality: 'presential',
+  address: 'Buenos Aires 1088, Villa Alemana',
+  price: 30000,
+  professionalName: 'Ps. Stefany Osorio',
+  professionalPhone: '+56966898588',
+  modifyUrl: 'https://example.com/cita/tok/modificar',
+  cancelUrl: 'https://example.com/cita/tok/anular',
+  googleCalendarUrl: 'https://calendar.google.com/render?action=TEMPLATE',
+  startDateTime: new Date('2026-07-15T10:00:00.000Z'),
+  endDateTime: new Date('2026-07-15T10:45:00.000Z'),
+}
 
+const REMINDER_DATA: AppointmentReminderData = {
+  clientName: 'Ana Pérez',
+  serviceName: 'Primera visita',
+  date: 'Miércoles, 15 de julio de 2026',
+  startTime: '10:00',
+  endTime: '10:45',
+  modality: 'online',
+  googleCalendarUrl: 'https://calendar.google.com/render?action=TEMPLATE',
+  startDateTime: new Date('2026-07-15T10:00:00.000Z'),
+  endDateTime: new Date('2026-07-15T10:45:00.000Z'),
+}
+
+const MODIFIED_DATA: AppointmentModifiedData = {
+  clientName: 'Ana Pérez',
+  originalDate: 'Lunes, 13 de julio de 2026',
+  originalTime: '09:00',
+  newServiceName: 'Primera visita',
+  newDate: 'Miércoles, 15 de julio de 2026',
+  newStartTime: '10:00',
+  newEndTime: '10:45',
+  modality: 'presential',
+  address: 'Buenos Aires 1088, Villa Alemana',
+  price: 30000,
+  professionalName: 'Ps. Stefany Osorio',
+  professionalPhone: '+56966898588',
+  modifyUrl: 'https://example.com/cita/tok/modificar',
+  cancelUrl: 'https://example.com/cita/tok/anular',
+  googleCalendarUrl: 'https://calendar.google.com/render?action=TEMPLATE',
+  newStartDateTime: new Date('2026-07-15T10:00:00.000Z'),
+  newEndDateTime: new Date('2026-07-15T10:45:00.000Z'),
+}
+
+beforeEach(() => {
+  sendMock.mockReset()
+  process.env.RESEND_API_KEY = 're_test_key'
+  process.env.RESEND_FROM_EMAIL = 'noreply@mail.int0thesrv.cl'
+  process.env.RESEND_FROM_NAME = 'Ps. Stefany Osorio'
+})
+
+describe('EmailService — envío base', () => {
   it('sends an email via Resend with the from address, recipient, subject and html', async () => {
     sendMock.mockResolvedValue({ data: { id: 'email-1' }, error: null })
 
     const emailService = new EmailService()
     await emailService.sendReviewRequest('ana@test.com', REVIEW_DATA)
 
-    expect(sendMock).toHaveBeenCalledWith({
-      from: 'Ps. Stefany Osorio <noreply@mail.int0thesrv.cl>',
-      to: 'ana@test.com',
-      subject: '⭐ ¿Cómo fue tu sesión con Ps. Stefany Osorio?',
-      html: expect.stringContaining('Ana Pérez'),
-    })
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: 'Ps. Stefany Osorio <noreply@mail.int0thesrv.cl>',
+        to: 'ana@test.com',
+        subject: '⭐ ¿Cómo fue tu sesión con Ps. Stefany Osorio?',
+        html: expect.stringContaining('Ana Pérez'),
+      }),
+    )
   })
 
   it('throws when Resend returns an error', async () => {
@@ -44,5 +99,62 @@ describe('EmailService', () => {
 
     const emailService = new EmailService()
     await expect(emailService.sendReviewRequest('ana@test.com', REVIEW_DATA)).rejects.toThrow('invalid recipient')
+  })
+})
+
+describe('EmailService — adjunto ICS', () => {
+  it('sendAppointmentConfirmation adjunta un archivo cita.ics', async () => {
+    sendMock.mockResolvedValue({ data: { id: 'email-2' }, error: null })
+
+    const emailService = new EmailService()
+    await emailService.sendAppointmentConfirmation('ana@test.com', CONFIRMATION_DATA)
+
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [
+          expect.objectContaining({ filename: 'cita.ics', content: expect.any(Buffer) }),
+        ],
+      }),
+    )
+  })
+
+  it('sendAppointmentConfirmation — el ICS contiene la fecha correcta', async () => {
+    sendMock.mockResolvedValue({ data: { id: 'email-3' }, error: null })
+
+    const emailService = new EmailService()
+    await emailService.sendAppointmentConfirmation('ana@test.com', CONFIRMATION_DATA)
+
+    const call = sendMock.mock.calls[0][0]
+    const icsContent = (call.attachments[0].content as Buffer).toString()
+    expect(icsContent).toContain('DTSTART:20260715T100000Z')
+    expect(icsContent).toContain('SUMMARY:Primera visita')
+  })
+
+  it('sendAppointmentReminder adjunta un archivo cita.ics', async () => {
+    sendMock.mockResolvedValue({ data: { id: 'email-4' }, error: null })
+
+    const emailService = new EmailService()
+    await emailService.sendAppointmentReminder('ana@test.com', REMINDER_DATA)
+
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [
+          expect.objectContaining({ filename: 'cita.ics', content: expect.any(Buffer) }),
+        ],
+      }),
+    )
+  })
+
+  it('sendAppointmentModified adjunta un archivo cita.ics con la nueva fecha', async () => {
+    sendMock.mockResolvedValue({ data: { id: 'email-5' }, error: null })
+
+    const emailService = new EmailService()
+    await emailService.sendAppointmentModified('ana@test.com', MODIFIED_DATA)
+
+    const call = sendMock.mock.calls[0][0]
+    expect(call.attachments).toHaveLength(1)
+    expect(call.attachments[0].filename).toBe('cita.ics')
+    const icsContent = (call.attachments[0].content as Buffer).toString()
+    expect(icsContent).toContain('DTSTART:20260715T100000Z')
   })
 })

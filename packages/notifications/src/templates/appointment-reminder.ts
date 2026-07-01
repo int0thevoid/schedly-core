@@ -10,6 +10,8 @@ export interface AppointmentReminderData {
   address?: string
   meetLink?: string
   googleCalendarUrl: string
+  startDateTime: Date
+  endDateTime: Date
 }
 
 function renderLocation(data: AppointmentReminderData): string {
