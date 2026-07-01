@@ -1,56 +1,63 @@
 import type {
-  AppointmentAutoCancelledData,
-  AppointmentCancelledData,
   AppointmentConfirmationData,
+  AppointmentModifiedData,
   AppointmentReminderData,
+  AppointmentCancelledByPatientData,
+  ProfessionalCancellationNoticeData,
+  ProfessionalNewBookingData,
   DailyDigestAppointment,
   DailyDigestData,
-  PaymentReminderData,
-  TransferData,
 } from '@schedly/notifications'
 import type { Appointment, Professional, Service } from '../generated/prisma/index.js'
-import { getBankName } from '../data/banks.js'
+import { generateGoogleCalendarUrl } from '@schedly/notifications'
 
 export type AppointmentWithService = Appointment & { service: Service }
 
-/** Formatea una fecha como "Martes 10 de junio de 2026" en la zona horaria del profesional. */
 export function formatAppointmentDate(date: Date, timezone: string): string {
   const weekday = new Intl.DateTimeFormat('es-CL', { timeZone: timezone, weekday: 'long' }).format(date)
   const rest = new Intl.DateTimeFormat('es-CL', { timeZone: timezone, day: 'numeric', month: 'long', year: 'numeric' }).format(date)
-  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${rest}`
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${rest}`
 }
 
-/** Formatea un rango horario como "14:00 - 14:45" en la zona horaria del profesional. */
+export function formatAppointmentTime(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('es-CL', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
+}
+
 export function formatAppointmentTimeRange(start: Date, end: Date, timezone: string): string {
   const fmt = new Intl.DateTimeFormat('es-CL', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false })
   return `${fmt.format(start)} - ${fmt.format(end)}`
-}
-
-/** Formatea una hora como "14:00" en la zona horaria del profesional. */
-export function formatAppointmentTime(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat('es-CL', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
 }
 
 function toModality(modality: string): 'presential' | 'online' {
   return modality === 'online' ? 'online' : 'presential'
 }
 
-/** Construye la URL pública (sin autenticación) que el cliente usa para confirmar su asistencia. */
-function buildConfirmAttendanceUrl(appointmentId: string): string {
-  const base = process.env.API_BASE_URL ?? 'http://localhost:3001'
-  return `${base}/api/appointments/${appointmentId}/confirm-attendance`
-}
-
-/** Construye la URL al panel de administración (agenda) usada en el resumen diario. */
 function buildAdminAgendaUrl(): string {
   const base = process.env.ADMIN_URL ?? 'http://localhost:5173'
   return `${base}/admin/agenda`
 }
 
-/**
- * Determina el color y la etiqueta de una cita según su estado de pago y de
- * confirmación de asistencia, para usar en el resumen diario del profesional.
- */
+function buildTokenUrl(token: string, action: 'modificar' | 'anular'): string {
+  const base = process.env.FRONTEND_URL ?? 'http://localhost:5173'
+  return `${base}/cita/${token}/${action}`
+}
+
+function buildBookingUrl(): string {
+  return process.env.FRONTEND_URL ?? 'http://localhost:5173'
+}
+
+function buildGoogleCalendarUrl(appointment: AppointmentWithService, professional: Professional): string {
+  const modality = toModality(appointment.modality)
+  const location = modality === 'presential' ? (process.env.PROFESSIONAL_ADDRESS ?? undefined) : undefined
+  return generateGoogleCalendarUrl({
+    title: `${appointment.service.name} — ${professional.name}`,
+    startDateTime: appointment.startDateTime,
+    endDateTime: appointment.endDateTime,
+    description: `Sesión de psicología con ${professional.name}`,
+    location,
+  })
+}
+
 export function getAppointmentColorInfo(appointment: {
   paymentStatus: string
   attendanceConfirmed: boolean
@@ -66,92 +73,134 @@ export function getAppointmentColorInfo(appointment: {
     : { color: '#E76F51', colorLabel: 'Sin confirmar ni pagar' }
 }
 
-/** Construye los datos de transferencia del profesional, o undefined si no están todos configurados. */
-export function buildTransferData(professional: Professional): TransferData | undefined {
-  const { transferRut, transferBank, transferAccountType, transferAccountNumber, transferEmail } = professional
-  if (!transferRut || !transferBank || !transferAccountType || !transferAccountNumber || !transferEmail) {
-    return undefined
-  }
-  return {
-    rut: transferRut,
-    bank: getBankName(transferBank),
-    accountType: transferAccountType,
-    accountNumber: transferAccountNumber,
-    email: transferEmail,
-  }
-}
-
 export function buildAppointmentConfirmationData(
   appointment: AppointmentWithService,
-  professional: Professional
+  professional: Professional,
 ): AppointmentConfirmationData {
   const modality = toModality(appointment.modality)
+  const token = appointment.appointmentToken ?? ''
   return {
     clientName: appointment.clientName,
     serviceName: appointment.service.name,
     date: formatAppointmentDate(appointment.startDateTime, professional.timezone),
-    time: formatAppointmentTimeRange(appointment.startDateTime, appointment.endDateTime, professional.timezone),
+    startTime: formatAppointmentTime(appointment.startDateTime, professional.timezone),
+    endTime: formatAppointmentTime(appointment.endDateTime, professional.timezone),
     modality,
     address: modality === 'presential' ? process.env.PROFESSIONAL_ADDRESS : undefined,
     price: appointment.service.price,
     professionalName: professional.name,
     professionalPhone: professional.phone ?? '',
-    transferData: appointment.paymentStatus === 'unpaid' ? buildTransferData(professional) : undefined,
-    confirmAttendanceUrl: buildConfirmAttendanceUrl(appointment.id),
+    modifyUrl: buildTokenUrl(token, 'modificar'),
+    cancelUrl: buildTokenUrl(token, 'anular'),
+    googleCalendarUrl: buildGoogleCalendarUrl(appointment, professional),
   }
 }
 
 export function buildAppointmentReminderData(
   appointment: AppointmentWithService,
   professional: Professional,
-  hoursUntil: number
 ): AppointmentReminderData {
   const modality = toModality(appointment.modality)
   return {
     clientName: appointment.clientName,
     serviceName: appointment.service.name,
     date: formatAppointmentDate(appointment.startDateTime, professional.timezone),
-    time: formatAppointmentTimeRange(appointment.startDateTime, appointment.endDateTime, professional.timezone),
+    startTime: formatAppointmentTime(appointment.startDateTime, professional.timezone),
+    endTime: formatAppointmentTime(appointment.endDateTime, professional.timezone),
     modality,
     address: modality === 'presential' ? process.env.PROFESSIONAL_ADDRESS : undefined,
-    professionalName: professional.name,
-    professionalPhone: professional.phone ?? '',
-    hoursUntil,
-    confirmAttendanceUrl: hoursUntil === 24 ? buildConfirmAttendanceUrl(appointment.id) : undefined,
+    googleCalendarUrl: buildGoogleCalendarUrl(appointment, professional),
   }
 }
 
-/** Retorna null si el profesional no tiene configurados los datos de transferencia. */
-export function buildPaymentReminderData(appointment: AppointmentWithService, professional: Professional): PaymentReminderData | null {
-  const transferData = buildTransferData(professional)
-  if (!transferData) return null
+export function buildNewBookingForProfessionalData(
+  appointment: AppointmentWithService,
+  professional: Professional,
+): ProfessionalNewBookingData {
+  const modality = toModality(appointment.modality)
+  return {
+    clientName: appointment.clientName,
+    clientEmail: appointment.clientEmail,
+    clientPhone: appointment.clientPhone,
+    serviceName: appointment.service.name,
+    date: formatAppointmentDate(appointment.startDateTime, professional.timezone),
+    startTime: formatAppointmentTime(appointment.startDateTime, professional.timezone),
+    endTime: formatAppointmentTime(appointment.endDateTime, professional.timezone),
+    modality: modality === 'presential' ? 'Presencial' : 'Online',
+    price: appointment.service.price,
+    adminUrl: buildAdminAgendaUrl(),
+  }
+}
 
+export function buildAppointmentModifiedData(
+  originalAppointment: AppointmentWithService,
+  newAppointment: AppointmentWithService,
+  professional: Professional,
+): AppointmentModifiedData {
+  const modality = toModality(newAppointment.modality)
+  const newToken = newAppointment.appointmentToken ?? ''
+  return {
+    clientName: newAppointment.clientName,
+    originalDate: formatAppointmentDate(originalAppointment.startDateTime, professional.timezone),
+    originalTime: formatAppointmentTime(originalAppointment.startDateTime, professional.timezone),
+    newServiceName: newAppointment.service.name,
+    newDate: formatAppointmentDate(newAppointment.startDateTime, professional.timezone),
+    newStartTime: formatAppointmentTime(newAppointment.startDateTime, professional.timezone),
+    newEndTime: formatAppointmentTime(newAppointment.endDateTime, professional.timezone),
+    modality,
+    address: modality === 'presential' ? process.env.PROFESSIONAL_ADDRESS : undefined,
+    price: newAppointment.service.price,
+    professionalName: professional.name,
+    professionalPhone: professional.phone ?? '',
+    modifyUrl: buildTokenUrl(newToken, 'modificar'),
+    cancelUrl: buildTokenUrl(newToken, 'anular'),
+    googleCalendarUrl: buildGoogleCalendarUrl(newAppointment, professional),
+  }
+}
+
+export function buildAppointmentCancelledByPatientData(
+  appointment: AppointmentWithService,
+  professional: Professional,
+): AppointmentCancelledByPatientData {
   return {
     clientName: appointment.clientName,
     serviceName: appointment.service.name,
     date: formatAppointmentDate(appointment.startDateTime, professional.timezone),
-    time: formatAppointmentTimeRange(appointment.startDateTime, appointment.endDateTime, professional.timezone),
-    price: appointment.service.price,
-    transferData,
-    professionalPhone: professional.phone ?? '',
+    startTime: formatAppointmentTime(appointment.startDateTime, professional.timezone),
+    professionalName: professional.name,
+    bookingUrl: buildBookingUrl(),
   }
 }
 
-/** Construye los datos del resumen diario a partir de las citas (no canceladas) del día siguiente. */
+export function buildProfessionalCancellationNoticeData(
+  appointment: AppointmentWithService,
+  professional: Professional,
+): ProfessionalCancellationNoticeData {
+  return {
+    clientName: appointment.clientName,
+    clientEmail: appointment.clientEmail,
+    clientPhone: appointment.clientPhone,
+    serviceName: appointment.service.name,
+    date: formatAppointmentDate(appointment.startDateTime, professional.timezone),
+    startTime: formatAppointmentTime(appointment.startDateTime, professional.timezone),
+    adminUrl: buildAdminAgendaUrl(),
+  }
+}
+
 export function buildDailyDigestData(
   appointments: AppointmentWithService[],
   professional: Professional,
-  date: string
+  date: string,
 ): DailyDigestData {
   const digestAppointments: DailyDigestAppointment[] = appointments
-    .filter((appointment) => appointment.status !== 'cancelled')
-    .map((appointment) => {
-      const { color, colorLabel } = getAppointmentColorInfo(appointment)
+    .filter((a) => a.status !== 'cancelled')
+    .map((a) => {
+      const { color, colorLabel } = getAppointmentColorInfo(a)
       return {
-        time: formatAppointmentTime(appointment.startDateTime, professional.timezone),
-        clientName: appointment.clientName,
-        serviceName: appointment.service.name,
-        modality: toModality(appointment.modality) === 'online' ? 'Online' : 'Presencial',
+        time: formatAppointmentTime(a.startDateTime, professional.timezone),
+        clientName: a.clientName,
+        serviceName: a.service.name,
+        modality: toModality(a.modality) === 'online' ? 'Online' : 'Presencial',
         color,
         colorLabel,
       }
@@ -162,27 +211,5 @@ export function buildDailyDigestData(
     date,
     appointments: digestAppointments,
     adminUrl: buildAdminAgendaUrl(),
-  }
-}
-
-export function buildAppointmentCancelledData(appointment: AppointmentWithService, professional: Professional): AppointmentCancelledData {
-  return {
-    clientName: appointment.clientName,
-    serviceName: appointment.service.name,
-    date: formatAppointmentDate(appointment.startDateTime, professional.timezone),
-    time: formatAppointmentTimeRange(appointment.startDateTime, appointment.endDateTime, professional.timezone),
-    professionalName: professional.name,
-    professionalPhone: professional.phone ?? '',
-  }
-}
-
-export function buildAppointmentAutoCancelledData(appointment: AppointmentWithService, professional: Professional): AppointmentAutoCancelledData {
-  return {
-    clientName: appointment.clientName,
-    serviceName: appointment.service.name,
-    date: formatAppointmentDate(appointment.startDateTime, professional.timezone),
-    time: formatAppointmentTimeRange(appointment.startDateTime, appointment.endDateTime, professional.timezone),
-    professionalName: professional.name,
-    professionalPhone: professional.phone ?? '',
   }
 }

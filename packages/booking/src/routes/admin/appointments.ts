@@ -4,7 +4,6 @@ import {
   listMonthlyAppointments,
   listWeeklyAppointments,
   notifyAppointmentConfirmation,
-  notifyPaymentPending,
   updateAppointmentAttendance,
   updateAppointmentOutcome,
   updateAppointmentPayment,
@@ -20,5 +19,4 @@ router.patch('/:id/payment', updateAppointmentPayment)
 router.patch('/:id/attendance', updateAppointmentAttendance)
 router.patch('/:id/outcome', updateAppointmentOutcome)
 router.patch('/:id/notify-confirmation', notifyAppointmentConfirmation)
-router.post('/:id/notify-payment', notifyPaymentPending)
 export default router

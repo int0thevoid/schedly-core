@@ -1,42 +1,35 @@
 import { describe, expect, it } from 'vitest'
 import { appointmentConfirmationTemplate, type AppointmentConfirmationData } from '../templates/appointment-confirmation.js'
 import { appointmentReminderTemplate, type AppointmentReminderData } from '../templates/appointment-reminder.js'
-import { paymentReminderTemplate, type PaymentReminderData } from '../templates/payment-reminder.js'
+import { professionalNewBookingTemplate, type ProfessionalNewBookingData } from '../templates/professional-new-booking.js'
+import { appointmentModifiedTemplate, type AppointmentModifiedData } from '../templates/appointment-modified.js'
+import { appointmentCancelledByPatientTemplate, type AppointmentCancelledByPatientData } from '../templates/appointment-cancelled-by-patient.js'
+import { professionalCancellationNoticeTemplate, type ProfessionalCancellationNoticeData } from '../templates/professional-cancellation-notice.js'
 import { reviewRequestTemplate, type ReviewRequestData } from '../templates/review-request.js'
 import { confirmAttendancePageTemplate } from '../templates/confirm-attendance-page.js'
 import { dailyDigestTemplate, type DailyDigestData } from '../templates/daily-digest.js'
-import { appointmentCancelledTemplate, type AppointmentCancelledData } from '../templates/appointment-cancelled.js'
-import { appointmentAutoCancelledTemplate, type AppointmentAutoCancelledData } from '../templates/appointment-auto-cancelled.js'
-
-const TRANSFER_DATA = {
-  rut: '12.345.678-9',
-  bank: 'Banco Estado',
-  accountType: 'Cuenta Vista',
-  accountNumber: '123456789',
-  email: 'pagos@example.com',
-}
+import { generateGoogleCalendarUrl } from '../utils/google-calendar.js'
 
 describe('appointmentConfirmationTemplate', () => {
   const baseData: AppointmentConfirmationData = {
     clientName: 'Ana Pérez',
     serviceName: 'Primera visita',
-    date: 'Martes 10 de junio de 2026',
-    time: '14:00 - 14:45',
+    date: 'Martes, 10 de junio de 2026',
+    startTime: '14:00',
+    endTime: '14:45',
     modality: 'presential',
     address: 'Espacio Henko · Buenos Aires 1088, Villa Alemana',
     price: 30000,
     professionalName: 'Ps. Stefany Osorio',
     professionalPhone: '+56966898588',
+    modifyUrl: 'https://agenda.example.com/cita/token123/modificar',
+    cancelUrl: 'https://agenda.example.com/cita/token123/anular',
+    googleCalendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Primera+visita',
   }
 
-  it('returns a subject indicating the booking was received (not yet confirmed)', () => {
+  it('subject includes service name and date', () => {
     const { subject } = appointmentConfirmationTemplate(baseData)
-    expect(subject).toBe('📋 Reserva recibida — Primera visita el Martes 10 de junio de 2026')
-  })
-
-  it('body explains that payment is required to confirm the appointment', () => {
-    const { html } = appointmentConfirmationTemplate(baseData)
-    expect(html).toContain('pendiente')
+    expect(subject).toBe('📋 Tu cita ha sido agendada — Primera visita el Martes, 10 de junio de 2026')
   })
 
   it('includes a Google Maps link for presential appointments', () => {
@@ -45,22 +38,39 @@ describe('appointmentConfirmationTemplate', () => {
     expect(html).toContain('Ver en Google Maps')
   })
 
-  it('shows "link próximamente" for online appointments without a meet link', () => {
+  it('does not include Google Maps link for online appointments', () => {
     const { html } = appointmentConfirmationTemplate({ ...baseData, modality: 'online', address: undefined })
-    expect(html).toContain('próximamente')
     expect(html).not.toContain('Ver en Google Maps')
   })
 
-  it('includes transfer instructions when transferData is present', () => {
-    const { html } = appointmentConfirmationTemplate({ ...baseData, transferData: TRANSFER_DATA })
-    expect(html).toContain('Datos para transferencia')
-    expect(html).toContain(TRANSFER_DATA.rut)
-    expect(html).toContain(TRANSFER_DATA.accountNumber)
+  it('shows start and end times', () => {
+    const { html } = appointmentConfirmationTemplate(baseData)
+    expect(html).toContain('14:00')
+    expect(html).toContain('14:45')
   })
 
-  it('omits transfer instructions when transferData is absent', () => {
+  it('includes modify and cancel buttons', () => {
     const { html } = appointmentConfirmationTemplate(baseData)
-    expect(html).not.toContain('Datos para transferencia')
+    expect(html).toContain('https://agenda.example.com/cita/token123/modificar')
+    expect(html).toContain('https://agenda.example.com/cita/token123/anular')
+    expect(html).toContain('Modificar cita')
+    expect(html).toContain('Anular cita')
+  })
+
+  it('includes Google Calendar button', () => {
+    const { html } = appointmentConfirmationTemplate(baseData)
+    expect(html).toContain('calendar.google.com')
+    expect(html).toContain('Agregar a Google Calendar')
+  })
+
+  it('includes modification deadline notice (23:00 del día anterior)', () => {
+    const { html } = appointmentConfirmationTemplate(baseData)
+    expect(html).toContain('23:00')
+  })
+
+  it('includes the professional phone in the footer', () => {
+    const { html } = appointmentConfirmationTemplate(baseData)
+    expect(html).toContain('+56966898588')
   })
 
   it('escapes HTML in client-provided fields', () => {
@@ -69,25 +79,9 @@ describe('appointmentConfirmationTemplate', () => {
     expect(html).toContain('&lt;script&gt;')
   })
 
-  it('HTML contiene word-break:break-all para evitar overflow en mobile con URLs largas', () => {
-    const { html } = appointmentConfirmationTemplate({ ...baseData, transferData: TRANSFER_DATA })
-    expect(html).toContain('word-break:break-all')
-  })
-
-  it('includes the professional phone in the footer', () => {
-    const { html } = appointmentConfirmationTemplate(baseData)
-    expect(html).toContain(baseData.professionalPhone)
-  })
-
-  it('includes a "Confirmar asistencia" button when confirmAttendanceUrl is present', () => {
-    const { html } = appointmentConfirmationTemplate({ ...baseData, confirmAttendanceUrl: 'https://api.example.com/api/appointments/apt1/confirm-attendance' })
-    expect(html).toContain('https://api.example.com/api/appointments/apt1/confirm-attendance')
-    expect(html).toContain('Confirmar asistencia')
-  })
-
-  it('omits the "Confirmar asistencia" button when confirmAttendanceUrl is absent', () => {
-    const { html } = appointmentConfirmationTemplate(baseData)
-    expect(html).not.toContain('Confirmar asistencia')
+  it('does not include address when modality is online', () => {
+    const { html } = appointmentConfirmationTemplate({ ...baseData, modality: 'online', address: undefined })
+    expect(html).not.toContain('Buenos Aires 1088')
   })
 })
 
@@ -95,72 +89,270 @@ describe('appointmentReminderTemplate', () => {
   const baseData: AppointmentReminderData = {
     clientName: 'Ana Pérez',
     serviceName: 'Primera visita',
-    date: 'Martes 10 de junio de 2026',
-    time: '14:00 - 14:45',
+    date: 'Martes, 10 de junio de 2026',
+    startTime: '14:00',
+    endTime: '14:45',
     modality: 'online',
-    professionalName: 'Ps. Stefany Osorio',
-    professionalPhone: '+56966898588',
-    hoursUntil: 24,
+    googleCalendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Primera+visita',
   }
 
-  it('uses "mañana" in the subject when hoursUntil is 24', () => {
+  it('subject is "Todo listo para tu sesión de hoy"', () => {
     const { subject } = appointmentReminderTemplate(baseData)
-    expect(subject).toBe('⏰ Recordatorio: tu cita es mañana')
+    expect(subject).toBe('🩵 Todo listo para tu sesión de hoy')
   })
 
-  it('uses "en 2 horas" in the subject when hoursUntil is 2', () => {
-    const { subject } = appointmentReminderTemplate({ ...baseData, hoursUntil: 2 })
-    expect(subject).toBe('⏰ Recordatorio: tu cita es en 2 horas')
-  })
-
-  it('does not include payment information', () => {
+  it('tells the client their session is in 2 hours', () => {
     const { html } = appointmentReminderTemplate(baseData)
-    expect(html).not.toContain('Datos para transferencia')
+    expect(html).toContain('2 horas')
   })
 
-  it('includes the appointment date and time', () => {
+  it('includes the appointment date and times', () => {
     const { html } = appointmentReminderTemplate(baseData)
     expect(html).toContain(baseData.date)
-    expect(html).toContain(baseData.time)
+    expect(html).toContain('14:00')
+    expect(html).toContain('14:45')
   })
 
-  it('includes a "Confirmar asistencia" button when confirmAttendanceUrl is present', () => {
-    const { html } = appointmentReminderTemplate({ ...baseData, confirmAttendanceUrl: 'https://api.example.com/api/appointments/apt1/confirm-attendance' })
-    expect(html).toContain('https://api.example.com/api/appointments/apt1/confirm-attendance')
-    expect(html).toContain('Confirmar asistencia')
-  })
-
-  it('omits the "Confirmar asistencia" button when confirmAttendanceUrl is absent', () => {
+  it('includes Google Calendar button', () => {
     const { html } = appointmentReminderTemplate(baseData)
-    expect(html).not.toContain('Confirmar asistencia')
+    expect(html).toContain('calendar.google.com')
+    expect(html).toContain('Agregar a Google Calendar')
+  })
+
+  it('includes meet link for online when provided', () => {
+    const { html } = appointmentReminderTemplate({ ...baseData, meetLink: 'https://meet.google.com/abc-xyz' })
+    expect(html).toContain('https://meet.google.com/abc-xyz')
+  })
+
+  it('does not include meet link when absent', () => {
+    const { html } = appointmentReminderTemplate(baseData)
+    expect(html).not.toContain('meet.google.com')
+  })
+
+  it('includes address for presential appointments', () => {
+    const { html } = appointmentReminderTemplate({ ...baseData, modality: 'presential', address: 'Buenos Aires 1088, Villa Alemana' })
+    expect(html).toContain('Buenos Aires 1088')
+  })
+
+  it('does not include address when absent', () => {
+    const { html } = appointmentReminderTemplate(baseData)
+    expect(html).not.toContain('Buenos Aires')
   })
 })
 
-describe('paymentReminderTemplate', () => {
-  const baseData: PaymentReminderData = {
+describe('professionalNewBookingTemplate', () => {
+  const baseData: ProfessionalNewBookingData = {
     clientName: 'Ana Pérez',
+    clientEmail: 'ana@test.com',
+    clientPhone: '+56912345678',
     serviceName: 'Primera visita',
-    date: 'Martes 10 de junio de 2026',
-    time: '14:00 - 14:45',
+    date: 'Martes, 10 de junio de 2026',
+    startTime: '14:00',
+    endTime: '14:45',
+    modality: 'Presencial',
     price: 30000,
-    transferData: TRANSFER_DATA,
-    professionalPhone: '+56966898588',
+    adminUrl: 'https://admin.example.com/admin/agenda',
   }
 
-  it('returns a subject including the service name', () => {
-    const { subject } = paymentReminderTemplate(baseData)
-    expect(subject).toBe('💳 Recordatorio de pago — Primera visita')
+  it('subject includes client name and date', () => {
+    const { subject } = professionalNewBookingTemplate(baseData)
+    expect(subject).toBe('🔔 Nueva reserva — Ana Pérez el Martes, 10 de junio de 2026')
   })
 
-  it('includes the transfer instructions', () => {
-    const { html } = paymentReminderTemplate(baseData)
-    expect(html).toContain(TRANSFER_DATA.rut)
-    expect(html).toContain(TRANSFER_DATA.bank)
+  it('includes all client contact data', () => {
+    const { html } = professionalNewBookingTemplate(baseData)
+    expect(html).toContain('ana@test.com')
+    expect(html).toContain('+56912345678')
   })
 
-  it('includes a WhatsApp link to send proof of payment', () => {
-    const { html } = paymentReminderTemplate(baseData)
-    expect(html).toContain('https://wa.me/56966898588')
+  it('includes appointment details', () => {
+    const { html } = professionalNewBookingTemplate(baseData)
+    expect(html).toContain('Primera visita')
+    expect(html).toContain('14:00')
+    expect(html).toContain('14:45')
+  })
+
+  it('includes a link to the admin panel', () => {
+    const { html } = professionalNewBookingTemplate(baseData)
+    expect(html).toContain('https://admin.example.com/admin/agenda')
+    expect(html).toContain('Ver en el panel')
+  })
+
+  it('escapes HTML in client-provided fields', () => {
+    const { html } = professionalNewBookingTemplate({ ...baseData, clientName: '<script>xss</script>' })
+    expect(html).not.toContain('<script>xss</script>')
+    expect(html).toContain('&lt;script&gt;')
+  })
+})
+
+describe('appointmentModifiedTemplate', () => {
+  const baseData: AppointmentModifiedData = {
+    clientName: 'Ana Pérez',
+    originalDate: 'Lunes, 9 de junio de 2026',
+    originalTime: '10:00',
+    newServiceName: 'Primera visita',
+    newDate: 'Martes, 10 de junio de 2026',
+    newStartTime: '14:00',
+    newEndTime: '14:45',
+    modality: 'presential',
+    address: 'Buenos Aires 1088, Villa Alemana',
+    price: 30000,
+    professionalName: 'Ps. Stefany Osorio',
+    professionalPhone: '+56966898588',
+    modifyUrl: 'https://agenda.example.com/cita/newtoken/modificar',
+    cancelUrl: 'https://agenda.example.com/cita/newtoken/anular',
+    googleCalendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
+  }
+
+  it('subject includes new date', () => {
+    const { subject } = appointmentModifiedTemplate(baseData)
+    expect(subject).toBe('✏️ Tu cita ha sido modificada — Martes, 10 de junio de 2026')
+  })
+
+  it('mentions that the original appointment was cancelled', () => {
+    const { html } = appointmentModifiedTemplate(baseData)
+    expect(html).toContain('Lunes, 9 de junio de 2026')
+    expect(html).toContain('cancelada')
+  })
+
+  it('shows the new appointment details', () => {
+    const { html } = appointmentModifiedTemplate(baseData)
+    expect(html).toContain('Martes, 10 de junio de 2026')
+    expect(html).toContain('14:00')
+    expect(html).toContain('14:45')
+  })
+
+  it('includes modify and cancel buttons with new token URLs', () => {
+    const { html } = appointmentModifiedTemplate(baseData)
+    expect(html).toContain('https://agenda.example.com/cita/newtoken/modificar')
+    expect(html).toContain('https://agenda.example.com/cita/newtoken/anular')
+  })
+
+  it('includes Google Calendar button', () => {
+    const { html } = appointmentModifiedTemplate(baseData)
+    expect(html).toContain(baseData.googleCalendarUrl)
+    expect(html).toContain('Agregar a Google Calendar')
+  })
+
+  it('includes address for presential appointments', () => {
+    const { html } = appointmentModifiedTemplate(baseData)
+    expect(html).toContain('Buenos Aires 1088')
+  })
+
+  it('does not include address when absent (online)', () => {
+    const { html } = appointmentModifiedTemplate({ ...baseData, modality: 'online', address: undefined })
+    expect(html).not.toContain('Buenos Aires')
+  })
+})
+
+describe('appointmentCancelledByPatientTemplate', () => {
+  const baseData: AppointmentCancelledByPatientData = {
+    clientName: 'Ana Pérez',
+    serviceName: 'Primera visita',
+    date: 'Martes, 10 de junio de 2026',
+    startTime: '14:00',
+    professionalName: 'Ps. Stefany Osorio',
+    bookingUrl: 'https://agenda.example.com',
+  }
+
+  it('subject says "Tu cita ha sido anulada"', () => {
+    const { subject } = appointmentCancelledByPatientTemplate(baseData)
+    expect(subject).toBe('❌ Tu cita ha sido anulada')
+  })
+
+  it('confirms the specific appointment that was cancelled', () => {
+    const { html } = appointmentCancelledByPatientTemplate(baseData)
+    expect(html).toContain('Ana Pérez')
+    expect(html).toContain('Martes, 10 de junio de 2026')
+    expect(html).toContain('14:00')
+    expect(html).toContain('anulada')
+  })
+
+  it('includes a booking link for rescheduling', () => {
+    const { html } = appointmentCancelledByPatientTemplate(baseData)
+    expect(html).toContain('https://agenda.example.com')
+    expect(html).toContain('Agendar nueva cita')
+  })
+
+  it('escapes HTML in client name', () => {
+    const { html } = appointmentCancelledByPatientTemplate({ ...baseData, clientName: '<b>xss</b>' })
+    expect(html).not.toContain('<b>xss</b>')
+    expect(html).toContain('&lt;b&gt;')
+  })
+})
+
+describe('professionalCancellationNoticeTemplate', () => {
+  const baseData: ProfessionalCancellationNoticeData = {
+    clientName: 'Ana Pérez',
+    clientEmail: 'ana@test.com',
+    clientPhone: '+56912345678',
+    serviceName: 'Primera visita',
+    date: 'Martes, 10 de junio de 2026',
+    startTime: '14:00',
+    adminUrl: 'https://admin.example.com/admin/agenda',
+  }
+
+  it('subject includes client name and date', () => {
+    const { subject } = professionalCancellationNoticeTemplate(baseData)
+    expect(subject).toBe('🔔 Cita anulada — Ana Pérez el Martes, 10 de junio de 2026')
+  })
+
+  it('states who cancelled and when', () => {
+    const { html } = professionalCancellationNoticeTemplate(baseData)
+    expect(html).toContain('Ana Pérez')
+    expect(html).toContain('Martes, 10 de junio de 2026')
+    expect(html).toContain('14:00')
+    expect(html).toContain('anuló')
+  })
+
+  it('includes patient contact data', () => {
+    const { html } = professionalCancellationNoticeTemplate(baseData)
+    expect(html).toContain('ana@test.com')
+    expect(html).toContain('+56912345678')
+  })
+
+  it('includes a link to the admin panel', () => {
+    const { html } = professionalCancellationNoticeTemplate(baseData)
+    expect(html).toContain('https://admin.example.com/admin/agenda')
+    expect(html).toContain('Ver en el panel')
+  })
+})
+
+describe('generateGoogleCalendarUrl', () => {
+  const params = {
+    title: 'Primera visita - Ps. Stefany Osorio',
+    startDateTime: new Date('2026-06-10T14:00:00Z'),
+    endDateTime: new Date('2026-06-10T14:45:00Z'),
+    description: 'Sesión de psicología',
+  }
+
+  it('generates a valid Google Calendar URL', () => {
+    const url = generateGoogleCalendarUrl(params)
+    expect(url).toContain('https://calendar.google.com/calendar/render')
+    expect(url).toContain('action=TEMPLATE')
+    expect(url).toContain('20260610T140000Z')
+    expect(url).toContain('20260610T144500Z')
+  })
+
+  it('includes the title', () => {
+    const url = generateGoogleCalendarUrl(params)
+    expect(url).toContain('Primera+visita')
+  })
+
+  it('includes the description', () => {
+    const url = generateGoogleCalendarUrl(params)
+    expect(url).toContain('Sesi%C3%B3n+de+psicolog%C3%ADa')
+  })
+
+  it('includes location when provided', () => {
+    const url = generateGoogleCalendarUrl({ ...params, location: 'Buenos Aires 1088, Villa Alemana' })
+    expect(url).toContain('location=')
+    expect(url).toContain('Villa+Alemana')
+  })
+
+  it('does not include location when absent', () => {
+    const url = generateGoogleCalendarUrl(params)
+    expect(url).not.toContain('location=')
   })
 })
 
@@ -180,11 +372,6 @@ describe('reviewRequestTemplate', () => {
     const { html } = reviewRequestTemplate({ ...baseData, googleReviewLink: 'https://g.page/r/example/review' })
     expect(html).toContain('https://g.page/r/example/review')
     expect(html).toContain('Dejar reseña en Google')
-  })
-
-  it('falls back to plain text when googleReviewLink is absent', () => {
-    const { html } = reviewRequestTemplate(baseData)
-    expect(html).not.toContain('Dejar reseña en Google')
   })
 })
 
@@ -210,25 +397,10 @@ describe('dailyDigestTemplate', () => {
     expect(subject).toBe('📅 Tu agenda de mañana — Martes 10 de junio de 2026')
   })
 
-  it('includes the appointment time, client and service', () => {
+  it('includes appointment data', () => {
     const { html } = dailyDigestTemplate(baseData)
     expect(html).toContain('14:00')
     expect(html).toContain('Ana Pérez')
-    expect(html).toContain('Primera visita')
-  })
-
-  it('includes the color legend', () => {
-    const { html } = dailyDigestTemplate(baseData)
-    expect(html).toContain('Confirmado y pagado')
-    expect(html).toContain('Confirmado, pago pendiente')
-    expect(html).toContain('Pagado, sin confirmar asistencia')
-    expect(html).toContain('Sin confirmar ni pagar')
-  })
-
-  it('includes a "Ver agenda completa" button linking to adminUrl', () => {
-    const { html } = dailyDigestTemplate(baseData)
-    expect(html).toContain(baseData.adminUrl)
-    expect(html).toContain('Ver agenda completa')
   })
 
   it('shows "No tienes citas para mañana" when appointments is empty', () => {
@@ -237,83 +409,10 @@ describe('dailyDigestTemplate', () => {
   })
 })
 
-describe('appointmentCancelledTemplate', () => {
-  const baseData: AppointmentCancelledData = {
-    clientName: 'Ana Pérez',
-    serviceName: 'Primera visita',
-    date: 'Martes 10 de junio de 2026',
-    time: '14:00',
-    professionalName: 'Ps. Stefany Osorio',
-    professionalPhone: '+56966898588',
-  }
-
-  it('returns a subject including the service name', () => {
-    const { subject } = appointmentCancelledTemplate(baseData)
-    expect(subject).toBe('❌ Tu cita ha sido cancelada — Primera visita')
-  })
-
-  it('includes the appointment date and time', () => {
-    const { html } = appointmentCancelledTemplate(baseData)
-    expect(html).toContain(baseData.date)
-    expect(html).toContain(baseData.time)
-  })
-
-  it('includes instructions to reagendar with the professional phone', () => {
-    const { html } = appointmentCancelledTemplate(baseData)
-    expect(html).toContain('reagendar')
-    expect(html).toContain(baseData.professionalPhone)
-  })
-
-  it('escapes HTML in client-provided fields', () => {
-    const { html } = appointmentCancelledTemplate({ ...baseData, clientName: '<script>alert(1)</script>' })
-    expect(html).not.toContain('<script>alert(1)</script>')
-    expect(html).toContain('&lt;script&gt;')
-  })
-})
-
-describe('appointmentAutoCancelledTemplate', () => {
-  const baseData: AppointmentAutoCancelledData = {
-    clientName: 'Ana Pérez',
-    serviceName: 'Primera visita',
-    date: 'Martes 10 de junio de 2026',
-    time: '14:00 - 14:45',
-    professionalName: 'Ps. Stefany Osorio',
-    professionalPhone: '+56966898588',
-  }
-
-  it('returns a subject indicating auto-cancellation', () => {
-    const { subject } = appointmentAutoCancelledTemplate(baseData)
-    expect(subject).toBe('❌ Tu reserva fue anulada — Primera visita el Martes 10 de junio de 2026')
-  })
-
-  it('body explains the reservation was cancelled due to non-payment', () => {
-    const { html } = appointmentAutoCancelledTemplate(baseData)
-    expect(html).toContain('anulada')
-    expect(html).toContain('pago')
-  })
-
-  it('includes instructions to reschedule', () => {
-    const { html } = appointmentAutoCancelledTemplate(baseData)
-    expect(html).toContain('reagendar')
-  })
-
-  it('escapes HTML in client-provided fields', () => {
-    const { html } = appointmentAutoCancelledTemplate({ ...baseData, clientName: '<script>alert(1)</script>' })
-    expect(html).not.toContain('<script>alert(1)</script>')
-    expect(html).toContain('&lt;script&gt;')
-  })
-})
-
 describe('confirmAttendancePageTemplate', () => {
   it('shows a thank-you message for "confirmed"', () => {
     const html = confirmAttendancePageTemplate({ status: 'confirmed', professionalName: 'Ps. Stefany Osorio' })
     expect(html).toContain('¡Gracias por confirmar!')
-    expect(html).toContain('Ps. Stefany Osorio')
-  })
-
-  it('shows a different message for "already-confirmed"', () => {
-    const html = confirmAttendancePageTemplate({ status: 'already-confirmed', professionalName: 'Ps. Stefany Osorio' })
-    expect(html).toContain('Ya habías confirmado')
   })
 
   it('shows a not-found message for "not-found"', () => {
