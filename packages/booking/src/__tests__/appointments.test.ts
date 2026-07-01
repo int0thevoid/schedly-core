@@ -283,7 +283,7 @@ describe('GET /api/appointments/token/:token', () => {
       status: 'pending',
       appointmentToken: 'tok_valid',
       tokenExpiresAt: future,
-      service: { name: 'Sesión' },
+      service: { id: 's1', name: 'Sesión', duration: 45, price: 30000 },
     }
     prismaMock.appointment.findUnique.mockResolvedValue(apt)
 
@@ -291,6 +291,10 @@ describe('GET /api/appointments/token/:token', () => {
     expect(res.status).toBe(200)
     expect(res.body.data.isExpired).toBe(false)
     expect(res.body.data.clientName).toBe('Ana')
+    expect(res.body.data.serviceId).toBe('s1')
+    expect(res.body.data.duration).toBe(45)
+    expect(res.body.data.price).toBe(30000)
+    expect(res.body.data.modality).toBe('online')
   })
 
   it('returns isExpired=true when tokenExpiresAt is in the past', async () => {
@@ -299,7 +303,7 @@ describe('GET /api/appointments/token/:token', () => {
       ...APPOINTMENT,
       appointmentToken: 'tok_expired',
       tokenExpiresAt: past,
-      service: { name: 'Sesión' },
+      service: { id: 's1', name: 'Sesión', duration: 45, price: 30000 },
     }
     prismaMock.appointment.findUnique.mockResolvedValue(apt)
 

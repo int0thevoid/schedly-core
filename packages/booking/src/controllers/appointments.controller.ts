@@ -189,6 +189,10 @@ export async function getAppointmentByToken(req: Request, res: Response): Promis
   ok(res, {
     id: appointment.id,
     serviceName: appointment.service.name,
+    serviceId: appointment.service.id,
+    duration: appointment.service.duration,
+    price: appointment.service.price,
+    modality: appointment.modality,
     date: appointment.startDateTime,
     time: appointment.startDateTime,
     clientName: appointment.clientName,
