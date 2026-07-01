@@ -25,6 +25,8 @@ describe('appointmentConfirmationTemplate', () => {
     modifyUrl: 'https://agenda.example.com/cita/token123/modificar',
     cancelUrl: 'https://agenda.example.com/cita/token123/anular',
     googleCalendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Primera+visita',
+    startDateTime: new Date('2026-06-10T14:00:00.000Z'),
+    endDateTime: new Date('2026-06-10T14:45:00.000Z'),
   }
 
   it('subject includes service name and date', () => {
@@ -94,6 +96,8 @@ describe('appointmentReminderTemplate', () => {
     endTime: '14:45',
     modality: 'online',
     googleCalendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Primera+visita',
+    startDateTime: new Date('2026-06-10T14:00:00.000Z'),
+    endDateTime: new Date('2026-06-10T14:45:00.000Z'),
   }
 
   it('subject is "Todo listo para tu sesión de hoy"', () => {
@@ -202,6 +206,8 @@ describe('appointmentModifiedTemplate', () => {
     modifyUrl: 'https://agenda.example.com/cita/newtoken/modificar',
     cancelUrl: 'https://agenda.example.com/cita/newtoken/anular',
     googleCalendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
+    newStartDateTime: new Date('2026-06-10T14:00:00.000Z'),
+    newEndDateTime: new Date('2026-06-10T14:45:00.000Z'),
   }
 
   it('subject includes new date', () => {

@@ -14,6 +14,8 @@ export interface AppointmentConfirmationData {
   modifyUrl: string
   cancelUrl: string
   googleCalendarUrl: string
+  startDateTime: Date
+  endDateTime: Date
 }
 
 function renderLocation(data: AppointmentConfirmationData): string {
