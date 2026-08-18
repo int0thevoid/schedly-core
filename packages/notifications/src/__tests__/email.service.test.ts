@@ -94,11 +94,33 @@ describe('EmailService — envío base', () => {
     )
   })
 
-  it('throws when Resend returns an error', async () => {
+  it('throws after retrying 3 times when Resend keeps returning an error', async () => {
+    vi.useFakeTimers()
     sendMock.mockResolvedValue({ data: null, error: { message: 'invalid recipient' } })
 
     const emailService = new EmailService()
-    await expect(emailService.sendReviewRequest('ana@test.com', REVIEW_DATA)).rejects.toThrow('invalid recipient')
+    const promise = emailService.sendReviewRequest('ana@test.com', REVIEW_DATA)
+    const assertion = expect(promise).rejects.toThrow('invalid recipient')
+    await vi.runAllTimersAsync()
+    await assertion
+
+    expect(sendMock).toHaveBeenCalledTimes(3)
+    vi.useRealTimers()
+  })
+
+  it('succeeds on the second attempt after a transient Resend error', async () => {
+    vi.useFakeTimers()
+    sendMock
+      .mockResolvedValueOnce({ data: null, error: { message: 'timeout' } })
+      .mockResolvedValueOnce({ data: { id: 'email-retry' }, error: null })
+
+    const emailService = new EmailService()
+    const promise = emailService.sendReviewRequest('ana@test.com', REVIEW_DATA)
+    await vi.runAllTimersAsync()
+    await promise
+
+    expect(sendMock).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
   })
 })
 
@@ -128,6 +150,8 @@ describe('EmailService — adjunto ICS', () => {
     const icsContent = (call.attachments[0].content as Buffer).toString()
     expect(icsContent).toContain('DTSTART:20260715T100000Z')
     expect(icsContent).toContain('SUMMARY:Primera visita')
+    expect(icsContent).toContain('DESCRIPTION:')
+    expect(icsContent).toMatch(/DESCRIPTION:.*Ps\. Stefany Osorio/)
   })
 
   it('sendAppointmentReminder adjunta un archivo cita.ics', async () => {
