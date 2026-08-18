@@ -23,7 +23,11 @@ export function Modal({ isOpen, onClose, title, children, className = '' }: Moda
   const [isPresent, setIsPresent] = useState(isOpen)
   const dialogRef = useRef<HTMLDivElement>(null)
 
-  useFocusTrap(dialogRef, isOpen)
+  // El diálogo recién existe en el DOM cuando isPresent pasa a true (un tick
+  // después de isOpen, ver el efecto de abajo). Activar el trap con isOpen
+  // directo dispara el efecto antes de que dialogRef.current exista, y como
+  // los refs no son reactivos nunca se reintenta cuando el diálogo se monta.
+  useFocusTrap(dialogRef, isOpen && isPresent)
 
   useEffect(() => {
     const timer = setTimeout(
@@ -88,6 +92,7 @@ export function Modal({ isOpen, onClose, title, children, className = '' }: Moda
             </h2>
           )}
           <button
+            type="button"
             onClick={onClose}
             className="ml-auto rounded-md p-1.5 transition-colors hover:bg-[var(--schedly-color-surface-elevated,#f2ebd7)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--schedly-color-primary,#5a8450)]"
             style={{ color: 'var(--schedly-color-text-subtle, #8a7f6e)' }}

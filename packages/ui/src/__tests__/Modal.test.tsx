@@ -58,6 +58,31 @@ describe('Modal', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
+  it('traps focus on the first focusable element when opened via the isOpen prop toggling from false to true (real usage pattern)', async () => {
+    const { rerender } = render(
+      <Modal isOpen={false} onClose={vi.fn()}>
+        <button>Primero</button>
+        <button>Segundo</button>
+      </Modal>,
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    rerender(
+      <Modal isOpen={true} onClose={vi.fn()}>
+        <button>Primero</button>
+        <button>Segundo</button>
+      </Modal>,
+    )
+
+    await screen.findByRole('dialog')
+    // El primer elemento focoseable del diálogo es su propio botón "Cerrar"
+    // (va antes que los children en el DOM) — lo importante es que el trap
+    // haya enfocado algo DENTRO del diálogo, no que quedara en document.body.
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cerrar' }))
+    })
+  })
+
   it('unmounts after exit animation when closed', () => {
     vi.useFakeTimers()
     const { rerender } = render(<Modal isOpen={true} onClose={vi.fn()}>Content</Modal>)
