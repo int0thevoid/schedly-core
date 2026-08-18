@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import type { NextFunction, Request, Response } from 'express'
 import { requireAuth } from './middleware/auth.js'
 import authRouter from './routes/auth.routes.js'
@@ -31,6 +32,24 @@ const app = express()
 app.use(helmet())
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }))
 app.use(express.json())
+
+// Defensa en profundidad contra fuerza bruta/abuso — no había ningún límite
+// de tasa en ningún endpoint, incluyendo el login admin.
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many login attempts, please try again later' },
+})
+app.use('/api', apiLimiter)
+app.use('/api/auth/login', loginLimiter)
 
 app.use('/api/auth', authRouter)
 app.use('/api/services', servicesRouter)

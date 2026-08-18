@@ -94,6 +94,20 @@ describe('POST /api/auth/login', () => {
       .send({ email: 'stefanyosorioalfaro@gmail.com' })
     expect(res.status).toBe(400)
   })
+
+  it('rate-limits repeated login attempts (brute-force protection)', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    const statuses: number[] = []
+    // Ya se hicieron varios intentos en los tests anteriores de este archivo;
+    // disparar de sobra garantiza cruzar el límite sin depender del conteo exacto previo.
+    for (let i = 0; i < 15; i++) {
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'stefanyosorioalfaro@gmail.com', password: 'wrongpassword' })
+      statuses.push(res.status)
+    }
+    expect(statuses).toContain(429)
+  })
 })
 
 describe('POST /api/auth/logout', () => {
