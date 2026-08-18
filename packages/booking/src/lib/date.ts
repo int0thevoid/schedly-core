@@ -3,6 +3,11 @@ export function todayInTZ(tz: string): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: tz })
 }
 
+/** Retorna la fecha (YYYY-MM-DD) de un instante dado, en la zona horaria indicada. */
+export function dateKeyInTZ(date: Date, tz: string): string {
+  return date.toLocaleDateString('en-CA', { timeZone: tz })
+}
+
 /** Suma (o resta) días a una fecha YYYY-MM-DD, sin depender de zona horaria. */
 export function addDaysToDateStr(dateStr: string, days: number): string {
   const [year, month, day] = dateStr.split('-').map(Number)

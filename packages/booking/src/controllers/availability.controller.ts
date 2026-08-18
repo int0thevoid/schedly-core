@@ -5,6 +5,7 @@ import { DEFAULT_PROFESSIONAL_CONFIG } from '../types.js'
 import { getAvailableSlots } from '../availability.js'
 import { prisma } from '../lib/prisma.js'
 import { fail, ok } from '../lib/response.js'
+import { dayRangeInTZ } from '../lib/date.js'
 import type {
   Appointment as DbAppointment,
   Professional,
@@ -12,6 +13,8 @@ import type {
   Service as DbService,
   WeeklySchedule as DbWeeklySchedule,
 } from '../generated/prisma/index.js'
+
+const TZ = 'America/Santiago'
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
 
@@ -111,6 +114,7 @@ async function fetchContextForDate(
   blocks: DbScheduleBlock[]
   appointments: DbAppointment[]
 }> {
+  const { gte, lte } = dayRangeInTZ(dateStr, TZ)
   const [service, professional, weeklySchedules, blocks, appointments] = await Promise.all([
     prisma.service.findUnique({ where: { id: serviceId } }),
     prisma.professional.findUnique({ where: { id: professionalId } }),
@@ -120,8 +124,8 @@ async function fetchContextForDate(
       where: {
         professionalId,
         status: { not: 'cancelled' },
-        startDateTime: { gte: new Date(`${dateStr}T00:00:00.000Z`) },
-        endDateTime: { lte: new Date(`${dateStr}T23:59:59.999Z`) },
+        startDateTime: { gte },
+        endDateTime: { lte },
       },
     }),
   ])
@@ -204,12 +208,13 @@ export async function getRangeAvailability(req: Request, res: Response): Promise
     const d = new Date(start.getTime() + i * 86_400_000)
     const dateStr = d.toISOString().slice(0, 10)
 
+    const { gte, lte } = dayRangeInTZ(dateStr, TZ)
     const appointments = await prisma.appointment.findMany({
       where: {
         professionalId,
         status: { not: 'cancelled' },
-        startDateTime: { gte: new Date(`${dateStr}T00:00:00.000Z`) },
-        endDateTime: { lte: new Date(`${dateStr}T23:59:59.999Z`) },
+        startDateTime: { gte },
+        endDateTime: { lte },
       },
     })
 

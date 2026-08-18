@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import request from 'supertest'
 import jwt from 'jsonwebtoken'
+import { dayRangeInTZ } from '../../lib/date.js'
+
+const TZ = 'America/Santiago'
 
 vi.mock('../../lib/prisma.js', () => ({ prisma: prismaMock }))
 
@@ -159,8 +162,8 @@ describe('GET /api/admin/appointments/weekly', () => {
       .get('/api/admin/appointments/weekly?startDate=2026-06-01&endDate=2026-06-07')
       .set('Authorization', token())
     const call = prismaMock.appointment.findMany.mock.calls[0][0]
-    expect(call.where.startDateTime.gte).toEqual(new Date('2026-06-01T00:00:00.000Z'))
-    expect(call.where.startDateTime.lte).toEqual(new Date('2026-06-07T23:59:59.999Z'))
+    expect(call.where.startDateTime.gte).toEqual(dayRangeInTZ('2026-06-01', TZ).gte)
+    expect(call.where.startDateTime.lte).toEqual(dayRangeInTZ('2026-06-07', TZ).lte)
   })
 })
 
@@ -335,8 +338,8 @@ describe('GET /api/admin/appointments/monthly', () => {
       .get('/api/admin/appointments/monthly?year=2026&month=6')
       .set('Authorization', token())
     const call = prismaMock.appointment.findMany.mock.calls[0][0]
-    expect(call.where.startDateTime.gte).toEqual(new Date('2026-06-01T00:00:00.000Z'))
-    expect(call.where.startDateTime.lte).toEqual(new Date('2026-06-30T23:59:59.999Z'))
+    expect(call.where.startDateTime.gte).toEqual(dayRangeInTZ('2026-06-01', TZ).gte)
+    expect(call.where.startDateTime.lte).toEqual(dayRangeInTZ('2026-06-30', TZ).lte)
   })
 })
 
