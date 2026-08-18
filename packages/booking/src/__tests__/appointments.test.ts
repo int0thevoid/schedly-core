@@ -66,6 +66,45 @@ describe('POST /api/appointments', () => {
     expect(res.status).toBe(409)
   })
 
+  it('runs the booking transaction with Serializable isolation', async () => {
+    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+    await request(app).post('/api/appointments').send(VALID_BODY)
+
+    expect(prismaMock.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: 'Serializable' },
+    )
+  })
+
+  it('retries once on a Serializable write conflict (P2034) and still succeeds', async () => {
+    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+    let calls = 0
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => {
+      calls++
+      if (calls === 1) throw { code: 'P2034', message: 'write conflict' }
+      return fn(prismaMock)
+    })
+
+    const res = await request(app).post('/api/appointments').send(VALID_BODY)
+    expect(res.status).toBe(201)
+    expect(calls).toBe(2)
+  })
+
+  it('gives up and returns 409 after repeated Serializable write conflicts', async () => {
+    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.$transaction.mockRejectedValue({ code: 'P2034', message: 'write conflict' })
+
+    const res = await request(app).post('/api/appointments').send(VALID_BODY)
+    expect(res.status).toBe(409)
+  })
+
   it('returns 400 for invalid email', async () => {
     const res = await request(app).post('/api/appointments').send({ ...VALID_BODY, clientEmail: 'not-an-email' })
     expect(res.status).toBe(400)
