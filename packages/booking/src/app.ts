@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import cookieParser from 'cookie-parser'
 import rateLimit from 'express-rate-limit'
 import type { NextFunction, Request, Response } from 'express'
 import { requireAuth } from './middleware/auth.js'
@@ -32,6 +33,7 @@ const app = express()
 app.use(helmet())
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }))
 app.use(express.json())
+app.use(cookieParser())
 
 // Defensa en profundidad contra fuerza bruta/abuso — no había ningún límite
 // de tasa en ningún endpoint, incluyendo el login admin.

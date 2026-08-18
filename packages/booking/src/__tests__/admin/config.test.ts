@@ -8,7 +8,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return `Bearer ${jwt.sign({ role: 'admin' }, 'dev-secret')}`
+  return jwt.sign({ role: 'admin' }, 'dev-secret')
 }
 
 const PROFESSIONAL = {
@@ -28,7 +28,7 @@ beforeEach(() => {
 describe('GET /api/admin/config', () => {
   it('returns professional config including patientSearchField', async () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
-    const res = await request(app).get('/api/admin/config').set('Authorization', token())
+    const res = await request(app).get('/api/admin/config').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toMatchObject({
       bookingWindowWeeks: 4,
@@ -41,35 +41,35 @@ describe('GET /api/admin/config', () => {
 
   it('returns treatmentTypes', async () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
-    const res = await request(app).get('/api/admin/config').set('Authorization', token())
+    const res = await request(app).get('/api/admin/config').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data.treatmentTypes).toEqual(['Ansiedad', 'Terapia de pareja'])
   })
 
   it('returns an empty array when treatmentTypes is not set', async () => {
     prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, treatmentTypes: undefined })
-    const res = await request(app).get('/api/admin/config').set('Authorization', token())
+    const res = await request(app).get('/api/admin/config').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data.treatmentTypes).toEqual([])
   })
 
   it('returns dailyDigestTime', async () => {
     prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, dailyDigestTime: '17:30' })
-    const res = await request(app).get('/api/admin/config').set('Authorization', token())
+    const res = await request(app).get('/api/admin/config').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data.dailyDigestTime).toBe('17:30')
   })
 
   it('defaults dailyDigestTime to 16:00 when not set', async () => {
     prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, dailyDigestTime: undefined })
-    const res = await request(app).get('/api/admin/config').set('Authorization', token())
+    const res = await request(app).get('/api/admin/config').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data.dailyDigestTime).toBe('16:00')
   })
 
   it('returns 404 when professional not found', async () => {
     prismaMock.professional.findUnique.mockResolvedValue(null)
-    const res = await request(app).get('/api/admin/config').set('Authorization', token())
+    const res = await request(app).get('/api/admin/config').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(404)
   })
 })
@@ -80,7 +80,7 @@ describe('PATCH /api/admin/config', () => {
     prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, bookingWindowWeeks: 8 })
     const res = await request(app)
       .patch('/api/admin/config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ bookingWindowWeeks: 8 })
     expect(res.status).toBe(200)
     expect(res.body.data.bookingWindowWeeks).toBe(8)
@@ -91,7 +91,7 @@ describe('PATCH /api/admin/config', () => {
     prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, patientSearchField: 'email' })
     const res = await request(app)
       .patch('/api/admin/config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ patientSearchField: 'email' })
     expect(res.status).toBe(200)
     expect(res.body.data.patientSearchField).toBe('email')
@@ -100,7 +100,7 @@ describe('PATCH /api/admin/config', () => {
   it('returns 400 for invalid patientSearchField value', async () => {
     const res = await request(app)
       .patch('/api/admin/config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ patientSearchField: 'invalid' })
     expect(res.status).toBe(400)
   })
@@ -110,7 +110,7 @@ describe('PATCH /api/admin/config', () => {
     prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, treatmentTypes: ['TCA'] })
     const res = await request(app)
       .patch('/api/admin/config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ treatmentTypes: ['TCA'] })
     expect(res.status).toBe(200)
     expect(res.body.data.treatmentTypes).toEqual(['TCA'])
@@ -124,7 +124,7 @@ describe('PATCH /api/admin/config', () => {
     prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, dailyDigestTime: '18:00' })
     const res = await request(app)
       .patch('/api/admin/config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ dailyDigestTime: '18:00' })
     expect(res.status).toBe(200)
     expect(res.body.data.dailyDigestTime).toBe('18:00')
@@ -136,7 +136,7 @@ describe('PATCH /api/admin/config', () => {
   it('returns 400 for invalid dailyDigestTime format', async () => {
     const res = await request(app)
       .patch('/api/admin/config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ dailyDigestTime: '25:00' })
     expect(res.status).toBe(400)
   })
@@ -144,7 +144,7 @@ describe('PATCH /api/admin/config', () => {
   it('returns 400 when treatmentTypes contains an empty string', async () => {
     const res = await request(app)
       .patch('/api/admin/config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ treatmentTypes: ['Ansiedad', ''] })
     expect(res.status).toBe(400)
   })
@@ -152,7 +152,7 @@ describe('PATCH /api/admin/config', () => {
   it('returns 400 when no fields provided', async () => {
     const res = await request(app)
       .patch('/api/admin/config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({})
     expect(res.status).toBe(400)
   })
@@ -160,7 +160,7 @@ describe('PATCH /api/admin/config', () => {
   it('returns 400 for invalid values', async () => {
     const res = await request(app)
       .patch('/api/admin/config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ bookingWindowWeeks: 100 })
     expect(res.status).toBe(400)
   })

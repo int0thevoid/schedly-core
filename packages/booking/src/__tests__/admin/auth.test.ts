@@ -31,7 +31,7 @@ const PROFESSIONAL = {
 }
 
 function authToken() {
-  return `Bearer ${jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'dev-secret')}`
+  return jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'dev-secret')
 }
 
 beforeEach(() => {
@@ -40,15 +40,22 @@ beforeEach(() => {
 })
 
 describe('POST /api/auth/login', () => {
-  it('returns 200 and a JWT token on valid credentials', async () => {
+  it('returns 200 and sets an httpOnly auth cookie on valid credentials (never the token in the body)', async () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     const res = await request(app)
       .post('/api/auth/login')
       .send({ email: 'stefanyosorioalfaro@gmail.com', password: PASSWORD })
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
-    expect(res.body.data.token).toBeDefined()
-    const decoded = jwt.verify(res.body.data.token, 'dev-secret') as { professionalId: string; role: string }
+    expect(res.body.data.token).toBeUndefined()
+
+    const setCookie = res.headers['set-cookie'] as unknown as string[]
+    const authCookie = setCookie?.find((c) => c.startsWith('auth_token='))
+    expect(authCookie).toBeDefined()
+    expect(authCookie).toContain('HttpOnly')
+
+    const tokenValue = authCookie!.split(';')[0].split('=')[1]
+    const decoded = jwt.verify(tokenValue, 'dev-secret') as { professionalId: string; role: string }
     expect(decoded.professionalId).toBe('pro1')
     expect(decoded.role).toBe('admin')
   })
@@ -111,10 +118,14 @@ describe('POST /api/auth/login', () => {
 })
 
 describe('POST /api/auth/logout', () => {
-  it('returns 200 with success true', async () => {
+  it('returns 200 with success true and clears the auth cookie', async () => {
     const res = await request(app).post('/api/auth/logout')
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ success: true })
+    const setCookie = res.headers['set-cookie'] as unknown as string[]
+    const authCookie = setCookie?.find((c) => c.startsWith('auth_token='))
+    expect(authCookie).toBeDefined()
+    expect(authCookie).toMatch(/auth_token=;/)
   })
 })
 
@@ -123,7 +134,7 @@ describe('GET /api/auth/me', () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     const res = await request(app)
       .get('/api/auth/me')
-      .set('Authorization', authToken())
+      .set('Cookie', `auth_token=${authToken()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toMatchObject({
       id: 'pro1',
@@ -142,7 +153,7 @@ describe('GET /api/auth/me', () => {
   it('returns 401 with invalid token', async () => {
     const res = await request(app)
       .get('/api/auth/me')
-      .set('Authorization', 'Bearer invalidtoken')
+      .set('Cookie', 'auth_token=invalidtoken')
     expect(res.status).toBe(401)
   })
 
@@ -150,7 +161,7 @@ describe('GET /api/auth/me', () => {
     prismaMock.professional.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .get('/api/auth/me')
-      .set('Authorization', authToken())
+      .set('Cookie', `auth_token=${authToken()}`)
     expect(res.status).toBe(404)
   })
 })

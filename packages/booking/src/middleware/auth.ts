@@ -2,14 +2,15 @@ import type { NextFunction, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { fail } from '../lib/response.js'
 
+export const AUTH_COOKIE_NAME = 'auth_token'
+
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  const header = req.headers.authorization
-  if (!header?.startsWith('Bearer ')) {
+  const token = req.cookies?.[AUTH_COOKIE_NAME] as string | undefined
+  if (!token) {
     fail(res, 'Unauthorized', 401)
     return
   }
   try {
-    const token = header.slice(7)
     const secret = process.env.JWT_SECRET ?? 'dev-secret'
     req.app.locals.admin = jwt.verify(token, secret)
     next()

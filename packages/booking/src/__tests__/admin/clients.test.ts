@@ -8,7 +8,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return `Bearer ${jwt.sign({ role: 'admin' }, 'dev-secret')}`
+  return jwt.sign({ role: 'admin' }, 'dev-secret')
 }
 
 const CLIENT = {
@@ -35,7 +35,7 @@ describe('GET /api/admin/clients', () => {
     prismaMock.client.findMany.mockResolvedValue([CLIENT])
     const res = await request(app)
       .get('/api/admin/clients?email=ana')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toHaveLength(1)
     expect(res.body.data[0]).toMatchObject({
@@ -49,7 +49,7 @@ describe('GET /api/admin/clients', () => {
     prismaMock.client.findMany.mockResolvedValue([CLIENT])
     const res = await request(app)
       .get('/api/admin/clients?q=ana')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toHaveLength(1)
     const call = prismaMock.client.findMany.mock.calls[0][0]
@@ -60,7 +60,7 @@ describe('GET /api/admin/clients', () => {
     prismaMock.client.findMany.mockResolvedValue([CLIENT])
     const res = await request(app)
       .get('/api/admin/clients?q=ana@example.com&field=email')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     const call = prismaMock.client.findMany.mock.calls[0][0]
     expect(call.where).toMatchObject({ email: { contains: 'ana@example.com', mode: 'insensitive' } })
@@ -70,7 +70,7 @@ describe('GET /api/admin/clients', () => {
     prismaMock.client.findMany.mockResolvedValue([{ ...CLIENT, rut: '12345678-9' }])
     const res = await request(app)
       .get('/api/admin/clients?q=12345678&field=rut')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     const call = prismaMock.client.findMany.mock.calls[0][0]
     expect(call.where).toMatchObject({ rut: { contains: '12345678', mode: 'insensitive' } })
@@ -80,7 +80,7 @@ describe('GET /api/admin/clients', () => {
     prismaMock.client.findMany.mockResolvedValue([CLIENT])
     const res = await request(app)
       .get('/api/admin/clients?q=569&field=phone')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     const call = prismaMock.client.findMany.mock.calls[0][0]
     expect(call.where).toMatchObject({ phone: { contains: '569', mode: 'insensitive' } })
@@ -89,7 +89,7 @@ describe('GET /api/admin/clients', () => {
   it('returns 400 for invalid field value', async () => {
     const res = await request(app)
       .get('/api/admin/clients?q=test&field=invalid')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(400)
   })
 
@@ -97,7 +97,7 @@ describe('GET /api/admin/clients', () => {
     prismaMock.client.findMany.mockResolvedValue([])
     const res = await request(app)
       .get('/api/admin/clients')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toEqual([])
   })
@@ -106,7 +106,7 @@ describe('GET /api/admin/clients', () => {
     prismaMock.client.findMany.mockResolvedValue([{ ...CLIENT, rut: '12345678-9' }])
     const res = await request(app)
       .get('/api/admin/clients?q=ana')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data[0].rut).toBe('12345678-9')
   })
@@ -122,7 +122,7 @@ describe('GET /api/admin/clients/:id', () => {
     prismaMock.client.findUnique.mockResolvedValue({ ...CLIENT, createdAt: new Date('2026-01-01T00:00:00Z') })
     const res = await request(app)
       .get('/api/admin/clients/c1')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toMatchObject({
       id: 'c1',
@@ -138,7 +138,7 @@ describe('GET /api/admin/clients/:id', () => {
     prismaMock.client.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .get('/api/admin/clients/does-not-exist')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(404)
   })
 
@@ -151,7 +151,7 @@ describe('GET /api/admin/clients/:id', () => {
     })
     const res = await request(app)
       .get('/api/admin/clients/c1')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data.treatmentType).toBe('Ansiedad')
     expect(res.body.data.dataConsentGiven).toBe(true)
@@ -169,7 +169,7 @@ describe('PATCH /api/admin/clients/:id', () => {
     prismaMock.client.update.mockResolvedValue({ ...CLIENT, treatmentType: 'Ansiedad' })
     const res = await request(app)
       .patch('/api/admin/clients/c1')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ treatmentType: 'Ansiedad' })
     expect(res.status).toBe(200)
     expect(res.body.data.treatmentType).toBe('Ansiedad')
@@ -186,7 +186,7 @@ describe('PATCH /api/admin/clients/:id', () => {
     prismaMock.client.update.mockResolvedValue({ ...CLIENT, treatmentType: null })
     const res = await request(app)
       .patch('/api/admin/clients/c1')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ treatmentType: null })
     expect(res.status).toBe(200)
     expect(res.body.data.treatmentType).toBeNull()
@@ -196,7 +196,7 @@ describe('PATCH /api/admin/clients/:id', () => {
     prismaMock.client.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/clients/does-not-exist')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ treatmentType: 'Ansiedad' })
     expect(res.status).toBe(404)
   })
@@ -204,7 +204,7 @@ describe('PATCH /api/admin/clients/:id', () => {
   it('returns 400 when treatmentType is missing from body', async () => {
     const res = await request(app)
       .patch('/api/admin/clients/c1')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({})
     expect(res.status).toBe(400)
   })
@@ -220,7 +220,7 @@ describe('GET /api/admin/clients/:id/stats', () => {
     prismaMock.client.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .get('/api/admin/clients/does-not-exist/stats')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(404)
   })
 
@@ -229,7 +229,7 @@ describe('GET /api/admin/clients/:id/stats', () => {
     prismaMock.appointment.findMany.mockResolvedValue([])
     const res = await request(app)
       .get('/api/admin/clients/c1/stats')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toMatchObject({
       lastAppointment: null,
@@ -266,7 +266,7 @@ describe('GET /api/admin/clients/:id/stats', () => {
     ])
     const res = await request(app)
       .get('/api/admin/clients/c1/stats')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toMatchObject({
       lastAppointment: '2026-06-15T10:00:00.000Z',

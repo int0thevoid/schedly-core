@@ -25,7 +25,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return `Bearer ${jwt.sign({ role: 'admin' }, 'dev-secret')}`
+  return jwt.sign({ role: 'admin' }, 'dev-secret')
 }
 
 const APT = {
@@ -55,26 +55,26 @@ beforeEach(() => {
 describe('GET /api/admin/appointments', () => {
   it('returns appointments for today by default', async () => {
     prismaMock.appointment.findMany.mockResolvedValue([APT])
-    const res = await request(app).get('/api/admin/appointments').set('Authorization', token())
+    const res = await request(app).get('/api/admin/appointments').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toHaveLength(1)
   })
 
   it('filters by date', async () => {
     prismaMock.appointment.findMany.mockResolvedValue([APT])
-    const res = await request(app).get('/api/admin/appointments?date=2026-06-03').set('Authorization', token())
+    const res = await request(app).get('/api/admin/appointments?date=2026-06-03').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(prismaMock.appointment.findMany).toHaveBeenCalled()
   })
 
   it('filters by status', async () => {
     prismaMock.appointment.findMany.mockResolvedValue([])
-    const res = await request(app).get('/api/admin/appointments?status=confirmed').set('Authorization', token())
+    const res = await request(app).get('/api/admin/appointments?status=confirmed').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
   })
 
   it('rejects invalid status', async () => {
-    const res = await request(app).get('/api/admin/appointments?status=unknown').set('Authorization', token())
+    const res = await request(app).get('/api/admin/appointments?status=unknown').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(400)
   })
 
@@ -83,7 +83,7 @@ describe('GET /api/admin/appointments', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-06T03:00:00Z'))
     prismaMock.appointment.findMany.mockResolvedValue([])
-    await request(app).get('/api/admin/appointments').set('Authorization', token())
+    await request(app).get('/api/admin/appointments').set('Cookie', `auth_token=${token()}`)
 
     const { where } = prismaMock.appointment.findMany.mock.calls[0][0] as { where: { startDateTime: { gte: Date } } }
     // gte should be start of June 5 in Santiago, not June 6 UTC
@@ -101,21 +101,21 @@ describe('GET /api/admin/appointments/weekly', () => {
   it('returns 400 when startDate is missing', async () => {
     const res = await request(app)
       .get('/api/admin/appointments/weekly?endDate=2026-06-07')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when endDate is missing', async () => {
     const res = await request(app)
       .get('/api/admin/appointments/weekly?startDate=2026-06-01')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when date format is invalid', async () => {
     const res = await request(app)
       .get('/api/admin/appointments/weekly?startDate=01-06-2026&endDate=2026-06-07')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(400)
   })
 
@@ -123,7 +123,7 @@ describe('GET /api/admin/appointments/weekly', () => {
     prismaMock.appointment.findMany.mockResolvedValue([])
     const res = await request(app)
       .get('/api/admin/appointments/weekly?startDate=2026-06-01&endDate=2026-06-03')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toMatchObject({
       '2026-06-01': [],
@@ -139,7 +139,7 @@ describe('GET /api/admin/appointments/weekly', () => {
     prismaMock.appointment.findMany.mockResolvedValue([apt1, apt2])
     const res = await request(app)
       .get('/api/admin/appointments/weekly?startDate=2026-06-01&endDate=2026-06-03')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data['2026-06-01']).toHaveLength(1)
     expect(res.body.data['2026-06-02']).toHaveLength(0)
@@ -151,7 +151,7 @@ describe('GET /api/admin/appointments/weekly', () => {
     prismaMock.appointment.findMany.mockResolvedValue([cancelled])
     const res = await request(app)
       .get('/api/admin/appointments/weekly?startDate=2026-06-01&endDate=2026-06-01')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data['2026-06-01'][0].status).toBe('cancelled')
   })
@@ -160,7 +160,7 @@ describe('GET /api/admin/appointments/weekly', () => {
     prismaMock.appointment.findMany.mockResolvedValue([])
     await request(app)
       .get('/api/admin/appointments/weekly?startDate=2026-06-01&endDate=2026-06-07')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     const call = prismaMock.appointment.findMany.mock.calls[0][0]
     expect(call.where.startDateTime.gte).toEqual(dayRangeInTZ('2026-06-01', TZ).gte)
     expect(call.where.startDateTime.lte).toEqual(dayRangeInTZ('2026-06-07', TZ).lte)
@@ -173,7 +173,7 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
     prismaMock.appointment.update.mockResolvedValue({ ...APT, status: 'confirmed' })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/status')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ status: 'confirmed' })
     expect(res.status).toBe(200)
     expect(res.body.data.status).toBe('confirmed')
@@ -182,7 +182,7 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
   it('returns 400 for invalid status', async () => {
     const res = await request(app)
       .patch('/api/admin/appointments/a1/status')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ status: 'invalid' })
     expect(res.status).toBe(400)
   })
@@ -191,7 +191,7 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
     prismaMock.appointment.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/appointments/bad/status')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ status: 'confirmed' })
     expect(res.status).toBe(404)
   })
@@ -204,7 +204,7 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
 
     const res = await request(app)
       .patch('/api/admin/appointments/a1/status')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ status: 'cancelled' })
 
     expect(res.status).toBe(200)
@@ -220,7 +220,7 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
 
     const res = await request(app)
       .patch('/api/admin/appointments/a1/status')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ status: 'confirmed' })
 
     expect(res.status).toBe(200)
@@ -235,7 +235,7 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
 
     const res = await request(app)
       .patch('/api/admin/appointments/a1/status')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ status: 'cancelled' })
 
     expect(res.status).toBe(200)
@@ -249,7 +249,7 @@ describe('PATCH /api/admin/appointments/:id/payment', () => {
     prismaMock.appointment.update.mockResolvedValue({ ...APT, paymentStatus: 'paid', paymentAmount: 30000 })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/payment')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ paymentStatus: 'paid', paymentAmount: 30000 })
     expect(res.status).toBe(200)
     expect(res.body.data.paymentStatus).toBe('paid')
@@ -258,7 +258,7 @@ describe('PATCH /api/admin/appointments/:id/payment', () => {
   it('returns 400 for missing amount', async () => {
     const res = await request(app)
       .patch('/api/admin/appointments/a1/payment')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ paymentStatus: 'paid' })
     expect(res.status).toBe(400)
   })
@@ -268,7 +268,7 @@ describe('PATCH /api/admin/appointments/:id/payment', () => {
     prismaMock.appointment.update.mockResolvedValue({ ...APT, paymentStatus: 'paid', paymentAmount: 30000, paymentMethod: 'cash' })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/payment')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ paymentStatus: 'paid', paymentAmount: 30000, paymentMethod: 'cash' })
     expect(res.status).toBe(200)
     expect(res.body.data.paymentMethod).toBe('cash')
@@ -280,7 +280,7 @@ describe('PATCH /api/admin/appointments/:id/payment', () => {
     prismaMock.appointment.update.mockResolvedValue({ ...paid, paymentStatus: 'unpaid', paymentAmount: null, paymentMethod: null })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/payment')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ paymentStatus: 'unpaid' })
     expect(res.status).toBe(200)
     expect(res.body.data.paymentStatus).toBe('unpaid')
@@ -296,14 +296,14 @@ describe('GET /api/admin/appointments/monthly', () => {
   it('returns 400 when year or month is missing', async () => {
     const res = await request(app)
       .get('/api/admin/appointments/monthly?year=2026')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(400)
   })
 
   it('returns 400 for invalid year format', async () => {
     const res = await request(app)
       .get('/api/admin/appointments/monthly?year=26&month=6')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(400)
   })
 
@@ -311,7 +311,7 @@ describe('GET /api/admin/appointments/monthly', () => {
     prismaMock.appointment.findMany.mockResolvedValue([])
     const res = await request(app)
       .get('/api/admin/appointments/monthly?year=2026&month=2')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(Object.keys(res.body.data)).toHaveLength(28)
     expect(res.body.data['2026-02-01']).toEqual([])
@@ -325,7 +325,7 @@ describe('GET /api/admin/appointments/monthly', () => {
     prismaMock.appointment.findMany.mockResolvedValue([apt1, apt2, apt3])
     const res = await request(app)
       .get('/api/admin/appointments/monthly?year=2026&month=6')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data['2026-06-03']).toHaveLength(2)
     expect(res.body.data['2026-06-15']).toHaveLength(1)
@@ -336,7 +336,7 @@ describe('GET /api/admin/appointments/monthly', () => {
     prismaMock.appointment.findMany.mockResolvedValue([])
     await request(app)
       .get('/api/admin/appointments/monthly?year=2026&month=6')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     const call = prismaMock.appointment.findMany.mock.calls[0][0]
     expect(call.where.startDateTime.gte).toEqual(dayRangeInTZ('2026-06-01', TZ).gte)
     expect(call.where.startDateTime.lte).toEqual(dayRangeInTZ('2026-06-30', TZ).lte)
@@ -349,7 +349,7 @@ describe('PATCH /api/admin/appointments/:id/attendance', () => {
     prismaMock.appointment.update.mockResolvedValue({ ...APT, attended: true })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/attendance')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ attended: true })
     expect(res.status).toBe(200)
     expect(res.body.data.attended).toBe(true)
@@ -360,7 +360,7 @@ describe('PATCH /api/admin/appointments/:id/attendance', () => {
     prismaMock.appointment.update.mockResolvedValue({ ...APT, attended: false })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/attendance')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ attended: false })
     expect(res.status).toBe(200)
     expect(res.body.data.attended).toBe(false)
@@ -369,7 +369,7 @@ describe('PATCH /api/admin/appointments/:id/attendance', () => {
   it('returns 400 for invalid body', async () => {
     const res = await request(app)
       .patch('/api/admin/appointments/a1/attendance')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ attended: 'yes' })
     expect(res.status).toBe(400)
   })
@@ -378,7 +378,7 @@ describe('PATCH /api/admin/appointments/:id/attendance', () => {
     prismaMock.appointment.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/appointments/bad/attendance')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ attended: true })
     expect(res.status).toBe(404)
   })
@@ -393,7 +393,7 @@ describe('PATCH /api/admin/appointments/:id/notify-confirmation', () => {
 
     const res = await request(app)
       .patch('/api/admin/appointments/a1/notify-confirmation')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({})
 
     expect(res.status).toBe(200)
@@ -409,7 +409,7 @@ describe('PATCH /api/admin/appointments/:id/notify-confirmation', () => {
 
     const res = await request(app)
       .patch('/api/admin/appointments/bad/notify-confirmation')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({})
 
     expect(res.status).toBe(404)
@@ -424,7 +424,7 @@ describe('PATCH /api/admin/appointments/:id/notify-confirmation', () => {
 
     const res = await request(app)
       .patch('/api/admin/appointments/a1/notify-confirmation')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({})
 
     expect(res.status).toBe(502)
@@ -438,7 +438,7 @@ describe('PATCH /api/admin/appointments/:id/outcome', () => {
 
     const res = await request(app)
       .patch('/api/admin/appointments/a1/outcome')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ outcome: 'attended' })
 
     expect(res.status).toBe(200)
@@ -454,7 +454,7 @@ describe('PATCH /api/admin/appointments/:id/outcome', () => {
 
     const res = await request(app)
       .patch('/api/admin/appointments/a1/outcome')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ outcome: null })
 
     expect(res.status).toBe(200)
@@ -467,7 +467,7 @@ describe('PATCH /api/admin/appointments/:id/outcome', () => {
   it('returns 400 for invalid outcome values', async () => {
     const res = await request(app)
       .patch('/api/admin/appointments/a1/outcome')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ outcome: 'invalid_outcome' })
 
     expect(res.status).toBe(400)
@@ -478,7 +478,7 @@ describe('PATCH /api/admin/appointments/:id/outcome', () => {
 
     const res = await request(app)
       .patch('/api/admin/appointments/bad/outcome')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ outcome: 'attended' })
 
     expect(res.status).toBe(404)

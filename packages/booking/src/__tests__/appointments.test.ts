@@ -480,7 +480,7 @@ describe('Admin routes — auth guard', () => {
   })
 
   it('returns 401 with invalid token', async () => {
-    const res = await request(app).get('/api/admin/appointments').set('Authorization', 'Bearer bad.token')
+    const res = await request(app).get('/api/admin/appointments').set('Cookie', 'auth_token=bad.token')
     expect(res.status).toBe(401)
   })
 
@@ -488,7 +488,7 @@ describe('Admin routes — auth guard', () => {
     prismaMock.appointment.findMany.mockResolvedValue([])
     const res = await request(app)
       .get('/api/admin/appointments')
-      .set('Authorization', `Bearer ${adminToken()}`)
+      .set('Cookie', `auth_token=${adminToken()}`)
     expect(res.status).toBe(200)
   })
 })
