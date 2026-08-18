@@ -1,14 +1,26 @@
-import type { Request, Response } from 'express'
+import type { CookieOptions, Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { fail, ok } from '../lib/response.js'
+import { AUTH_COOKIE_NAME } from '../middleware/auth.js'
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 })
+
+const SESSION_MS = 8 * 60 * 60 * 1000
+
+function authCookieOptions(): CookieOptions {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+  }
+}
 
 export async function login(req: Request, res: Response): Promise<void> {
   const parsed = loginSchema.safeParse(req.body)
@@ -33,10 +45,12 @@ export async function login(req: Request, res: Response): Promise<void> {
     { expiresIn: '8h' },
   )
 
-  ok(res, { token })
+  res.cookie(AUTH_COOKIE_NAME, token, { ...authCookieOptions(), maxAge: SESSION_MS })
+  ok(res, { success: true })
 }
 
 export function logout(_req: Request, res: Response): void {
+  res.clearCookie(AUTH_COOKIE_NAME, authCookieOptions())
   res.status(200).json({ success: true })
 }
 

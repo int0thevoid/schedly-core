@@ -8,7 +8,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return `Bearer ${jwt.sign({ role: 'admin' }, 'dev-secret')}`
+  return jwt.sign({ role: 'admin' }, 'dev-secret')
 }
 
 const BLOCK = {
@@ -27,7 +27,7 @@ beforeEach(() => {
 describe('GET /api/admin/schedule/blocks', () => {
   it('returns all blocks', async () => {
     prismaMock.scheduleBlock.findMany.mockResolvedValue([BLOCK])
-    const res = await request(app).get('/api/admin/schedule/blocks').set('Authorization', token())
+    const res = await request(app).get('/api/admin/schedule/blocks').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toHaveLength(1)
   })
@@ -39,7 +39,7 @@ describe('POST /api/admin/schedule/blocks', () => {
     prismaMock.scheduleBlock.create.mockResolvedValue(BLOCK)
     const res = await request(app)
       .post('/api/admin/schedule/blocks')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ title: 'Vacaciones', startDateTime: '2026-07-01T00:00:00Z', endDateTime: '2026-07-07T23:59:59Z' })
     expect(res.status).toBe(201)
     expect(res.body.data.title).toBe('Vacaciones')
@@ -53,7 +53,7 @@ describe('POST /api/admin/schedule/blocks', () => {
     }])
     const res = await request(app)
       .post('/api/admin/schedule/blocks')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ title: 'Bloq', startDateTime: '2026-07-01T00:00:00Z', endDateTime: '2026-07-07T23:59:59Z' })
     expect(res.status).toBe(409)
     expect(res.body.error).toBe('Hay citas agendadas en este horario')
@@ -63,7 +63,7 @@ describe('POST /api/admin/schedule/blocks', () => {
   it('returns 400 for missing title', async () => {
     const res = await request(app)
       .post('/api/admin/schedule/blocks')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ startDateTime: '2026-07-01T00:00:00Z', endDateTime: '2026-07-07T23:59:59Z' })
     expect(res.status).toBe(400)
   })
@@ -71,7 +71,7 @@ describe('POST /api/admin/schedule/blocks', () => {
   it('returns 400 when end is before start', async () => {
     const res = await request(app)
       .post('/api/admin/schedule/blocks')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ title: 'X', startDateTime: '2026-07-07T00:00:00Z', endDateTime: '2026-07-01T00:00:00Z' })
     expect(res.status).toBe(400)
   })
@@ -81,14 +81,14 @@ describe('DELETE /api/admin/schedule/blocks/:id', () => {
   it('deletes an existing block', async () => {
     prismaMock.scheduleBlock.findUnique.mockResolvedValue(BLOCK)
     prismaMock.scheduleBlock.delete.mockResolvedValue(BLOCK)
-    const res = await request(app).delete('/api/admin/schedule/blocks/blk1').set('Authorization', token())
+    const res = await request(app).delete('/api/admin/schedule/blocks/blk1').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data.id).toBe('blk1')
   })
 
   it('returns 404 when block not found', async () => {
     prismaMock.scheduleBlock.findUnique.mockResolvedValue(null)
-    const res = await request(app).delete('/api/admin/schedule/blocks/bad').set('Authorization', token())
+    const res = await request(app).delete('/api/admin/schedule/blocks/bad').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(404)
   })
 })

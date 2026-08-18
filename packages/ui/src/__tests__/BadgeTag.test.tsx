@@ -34,6 +34,15 @@ describe('Badge', () => {
     expect(container.firstChild).toHaveAttribute('data-variant', 'warning')
   })
 
+  it('success and warning variants use CSS custom properties instead of hardcoded colors, like every other variant', () => {
+    const success = render(<Badge variant="success">Disponible</Badge>).container.firstChild as HTMLElement
+    const warning = render(<Badge variant="warning">Últimos cupos</Badge>).container.firstChild as HTMLElement
+    expect(success.style.backgroundColor).toContain('var(--schedly-color-success')
+    expect(success.style.color).toContain('var(--schedly-color-success-dark')
+    expect(warning.style.backgroundColor).toContain('var(--schedly-color-warning')
+    expect(warning.style.color).toContain('var(--schedly-color-warning-dark')
+  })
+
   it('renders as inline span element', () => {
     const { container } = render(<Badge>Test</Badge>)
     expect(container.firstChild?.nodeName).toBe('SPAN')

@@ -240,13 +240,19 @@ export function filterBlockedSlots(slots: TimeSlot[], blocks: ScheduleBlock[]): 
 
 /**
  * Marca como no disponibles los slots solapados con citas activas (no canceladas).
+ * `bufferMinutes` extiende el margen ocupado de cada cita existente (antes y después)
+ * para respetar el buffer configurado entre pacientes — sin esto, un slot que empieza
+ * justo cuando termina la cita anterior se ofrecía como disponible.
  */
-export function filterOccupiedSlots(slots: TimeSlot[], appointments: Appointment[]): TimeSlot[] {
+export function filterOccupiedSlots(slots: TimeSlot[], appointments: Appointment[], bufferMinutes = 0): TimeSlot[] {
   const active = appointments.filter(a => a.status !== 'cancelled')
+  const bufferMs = bufferMinutes * 60 * 1000
   return slots.map(slot => {
-    const isOccupied = active.some(
-      apt => slot.startDateTime < apt.endDateTime && slot.endDateTime > apt.startDateTime,
-    )
+    const isOccupied = active.some(apt => {
+      const occupiedStart = new Date(apt.startDateTime.getTime() - bufferMs)
+      const occupiedEnd = new Date(apt.endDateTime.getTime() + bufferMs)
+      return slot.startDateTime < occupiedEnd && slot.endDateTime > occupiedStart
+    })
     return isOccupied ? { ...slot, isAvailable: false } : slot
   })
 }
@@ -321,5 +327,5 @@ export function getAvailableSlots(
       : { ...slot, isAvailable: false },
   )
 
-  return filterOccupiedSlots(filterBlockedSlots(inWindow, blocks), appointments).filter(s => s.isAvailable)
+  return filterOccupiedSlots(filterBlockedSlots(inWindow, blocks), appointments, buffer).filter(s => s.isAvailable)
 }

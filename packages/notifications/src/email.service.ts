@@ -27,6 +27,7 @@ export class EmailService {
       startDateTime: data.startDateTime,
       endDateTime: data.endDateTime,
       location: data.modality === 'presential' ? data.address : undefined,
+      description: `Cita con ${data.professionalName}. ${data.modality === 'presential' ? data.address ?? '' : 'Modalidad online'}`.trim(),
     })
     await this.send(to, subject, html, [{ filename: 'cita.ics', content: ics }])
   }
@@ -38,6 +39,7 @@ export class EmailService {
       startDateTime: data.startDateTime,
       endDateTime: data.endDateTime,
       location: data.modality === 'presential' ? data.address : undefined,
+      description: `Recordatorio: ${data.serviceName}. ${data.modality === 'presential' ? data.address ?? '' : 'Modalidad online'}`.trim(),
     })
     await this.send(to, subject, html, [{ filename: 'cita.ics', content: ics }])
   }
@@ -54,6 +56,7 @@ export class EmailService {
       startDateTime: data.newStartDateTime,
       endDateTime: data.newEndDateTime,
       location: data.modality === 'presential' ? data.address : undefined,
+      description: `Cita reagendada con ${data.professionalName}. ${data.modality === 'presential' ? data.address ?? '' : 'Modalidad online'}`.trim(),
     })
     await this.send(to, subject, html, [{ filename: 'cita.ics', content: ics }])
   }
@@ -79,16 +82,26 @@ export class EmailService {
   }
 
   private async send(to: string, subject: string, html: string, attachments?: Attachment[]): Promise<void> {
-    const { error } = await this.resend.emails.send({
-      from: this.from,
-      to,
-      subject,
-      html,
-      ...(attachments ? { attachments } : {}),
-    })
+    const MAX_ATTEMPTS = 3
+    let lastError: string | undefined
 
-    if (error) {
-      throw new Error(`Failed to send email: ${error.message}`)
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const { error } = await this.resend.emails.send({
+        from: this.from,
+        to,
+        subject,
+        html,
+        ...(attachments ? { attachments } : {}),
+      })
+
+      if (!error) return
+
+      lastError = error.message
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1000))
+      }
     }
+
+    throw new Error(`Failed to send email after ${MAX_ATTEMPTS} attempts: ${lastError}`)
   }
 }

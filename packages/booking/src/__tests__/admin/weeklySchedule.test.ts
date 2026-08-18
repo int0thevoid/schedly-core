@@ -8,7 +8,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return `Bearer ${jwt.sign({ role: 'admin' }, 'dev-secret')}`
+  return jwt.sign({ role: 'admin' }, 'dev-secret')
 }
 
 const WS_MON = {
@@ -32,7 +32,7 @@ describe('GET /api/admin/schedule/weekly', () => {
     prismaMock.weeklySchedule.findMany.mockResolvedValue([WS_MON])
     const res = await request(app)
       .get('/api/admin/schedule/weekly')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toHaveLength(1)
     expect(res.body.data[0].dayOfWeek).toBe(1)
@@ -52,7 +52,7 @@ describe('POST /api/admin/schedule/weekly', () => {
     prismaMock.weeklySchedule.create.mockResolvedValue(WS_MON)
     const res = await request(app)
       .post('/api/admin/schedule/weekly')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' })
     expect(res.status).toBe(201)
     expect(res.body.data.dayOfWeek).toBe(1)
@@ -66,7 +66,7 @@ describe('POST /api/admin/schedule/weekly', () => {
   it('returns 400 for missing dayOfWeek', async () => {
     const res = await request(app)
       .post('/api/admin/schedule/weekly')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ startTime: '09:00', endTime: '18:00' })
     expect(res.status).toBe(400)
   })
@@ -74,7 +74,7 @@ describe('POST /api/admin/schedule/weekly', () => {
   it('returns 400 for invalid dayOfWeek (0=Sunday not allowed)', async () => {
     const res = await request(app)
       .post('/api/admin/schedule/weekly')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ dayOfWeek: 0, startTime: '09:00', endTime: '18:00' })
     expect(res.status).toBe(400)
   })
@@ -82,7 +82,7 @@ describe('POST /api/admin/schedule/weekly', () => {
   it('returns 400 when end is not after start', async () => {
     const res = await request(app)
       .post('/api/admin/schedule/weekly')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ dayOfWeek: 1, startTime: '18:00', endTime: '09:00' })
     expect(res.status).toBe(400)
   })
@@ -94,7 +94,7 @@ describe('PATCH /api/admin/schedule/weekly/:id', () => {
     prismaMock.weeklySchedule.update.mockResolvedValue({ ...WS_MON, startTime: '10:00', endTime: '19:00' })
     const res = await request(app)
       .patch('/api/admin/schedule/weekly/ws1')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ startTime: '10:00', endTime: '19:00' })
     expect(res.status).toBe(200)
     expect(res.body.data.startTime).toBe('10:00')
@@ -108,7 +108,7 @@ describe('PATCH /api/admin/schedule/weekly/:id', () => {
     prismaMock.weeklySchedule.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/schedule/weekly/bad')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ startTime: '10:00', endTime: '19:00' })
     expect(res.status).toBe(404)
   })
@@ -116,7 +116,7 @@ describe('PATCH /api/admin/schedule/weekly/:id', () => {
   it('returns 400 for invalid time format', async () => {
     const res = await request(app)
       .patch('/api/admin/schedule/weekly/ws1')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ startTime: 'bad-time', endTime: '19:00' })
     expect(res.status).toBe(400)
   })
@@ -128,7 +128,7 @@ describe('DELETE /api/admin/schedule/weekly/:id', () => {
     prismaMock.weeklySchedule.delete.mockResolvedValue(WS_MON)
     const res = await request(app)
       .delete('/api/admin/schedule/weekly/ws1')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data.id).toBe('ws1')
   })
@@ -137,7 +137,7 @@ describe('DELETE /api/admin/schedule/weekly/:id', () => {
     prismaMock.weeklySchedule.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .delete('/api/admin/schedule/weekly/bad')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(404)
   })
 })

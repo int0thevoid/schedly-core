@@ -8,7 +8,7 @@ import {
   buildAppointmentConfirmationData,
   type AppointmentWithService,
 } from '../../lib/notification-data.js'
-import { dayRangeInTZ, todayInTZ } from '../../lib/date.js'
+import { addDaysToDateStr, dateKeyInTZ, dayRangeInTZ, todayInTZ } from '../../lib/date.js'
 
 const TZ = 'America/Santiago'
 
@@ -65,8 +65,8 @@ export async function listWeeklyAppointments(req: Request, res: Response): Promi
     where: {
       professionalId,
       startDateTime: {
-        gte: new Date(`${startDate}T00:00:00.000Z`),
-        lte: new Date(`${endDate}T23:59:59.999Z`),
+        gte: dayRangeInTZ(startDate, TZ).gte,
+        lte: dayRangeInTZ(endDate, TZ).lte,
       },
     },
     include: { service: true },
@@ -74,14 +74,13 @@ export async function listWeeklyAppointments(req: Request, res: Response): Promi
   })
 
   const grouped: Record<string, typeof appointments> = {}
-  const cursor = new Date(`${startDate}T00:00:00.000Z`)
-  const rangeEnd = new Date(`${endDate}T00:00:00.000Z`)
-  while (cursor <= rangeEnd) {
-    grouped[cursor.toISOString().slice(0, 10)] = []
-    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  let cursor = startDate
+  while (cursor <= endDate) {
+    grouped[cursor] = []
+    cursor = addDaysToDateStr(cursor, 1)
   }
   for (const apt of appointments) {
-    const key = apt.startDateTime.toISOString().slice(0, 10)
+    const key = dateKeyInTZ(apt.startDateTime, TZ)
     if (key in grouped) grouped[key].push(apt)
   }
 
@@ -99,26 +98,30 @@ export async function listMonthlyAppointments(req: Request, res: Response): Prom
   const month = Number(parsed.data.month)
   const professionalId = process.env.PROFESSIONAL_ID ?? ''
 
-  const firstDay = new Date(Date.UTC(year, month - 1, 1))
-  const lastDay = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
+  const firstDayStr = `${year}-${String(month).padStart(2, '0')}-01`
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const lastDayStr = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`
 
   const appointments = await prisma.appointment.findMany({
     where: {
       professionalId,
-      startDateTime: { gte: firstDay, lte: lastDay },
+      startDateTime: {
+        gte: dayRangeInTZ(firstDayStr, TZ).gte,
+        lte: dayRangeInTZ(lastDayStr, TZ).lte,
+      },
     },
     include: { service: true },
     orderBy: { startDateTime: 'asc' },
   })
 
   const grouped: Record<string, typeof appointments> = {}
-  const cursor = new Date(firstDay)
-  while (cursor <= lastDay) {
-    grouped[cursor.toISOString().slice(0, 10)] = []
-    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  let cursor = firstDayStr
+  while (cursor <= lastDayStr) {
+    grouped[cursor] = []
+    cursor = addDaysToDateStr(cursor, 1)
   }
   for (const apt of appointments) {
-    const key = apt.startDateTime.toISOString().slice(0, 10)
+    const key = dateKeyInTZ(apt.startDateTime, TZ)
     if (key in grouped) grouped[key].push(apt)
   }
 

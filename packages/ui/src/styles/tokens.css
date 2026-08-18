@@ -13,6 +13,12 @@
   --schedly-color-accent-light: #fae5db;
   --schedly-color-accent-faint: #fdf4f0;
 
+  /* Status palette */
+  --schedly-color-success: #dcfce7;
+  --schedly-color-success-dark: #15803d;
+  --schedly-color-warning: #fef3c7;
+  --schedly-color-warning-dark: #b45309;
+
   /* Surface colors */
   --schedly-color-background: #f9f5ec;
   --schedly-color-surface: #fdfcf8;

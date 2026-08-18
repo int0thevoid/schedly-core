@@ -463,6 +463,25 @@ describe('filterOccupiedSlots', () => {
     expect(blocked).toContain('11:00')
     expect(blocked).not.toContain('10:00')
   })
+
+  it('respeta el buffer configurado entre citas (no solo dentro de generateDaySlots)', () => {
+    const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, 45)
+    // Cita de 09:00 a 09:45 — sin buffer, el slot de 10:00 queda libre (caso ya
+    // cubierto arriba). Con 20 min de buffer, el margen ocupado real es
+    // 08:40-10:05, que sí se solapa con el slot de 10:00-10:45.
+    const aptStart = makeSantiagoDate('2024-01-15', '09:00')
+    const aptEnd = makeSantiagoDate('2024-01-15', '09:45')
+    const appointment = makeAppointment(aptStart, aptEnd)
+
+    const withoutBuffer = filterOccupiedSlots(slots, [appointment])
+    const withBuffer = filterOccupiedSlots(slots, [appointment], 20)
+
+    const slot1000WithoutBuffer = withoutBuffer.find(s => toSantiagoHHMM(s.startDateTime) === '10:00')
+    const slot1000WithBuffer = withBuffer.find(s => toSantiagoHHMM(s.startDateTime) === '10:00')
+
+    expect(slot1000WithoutBuffer?.isAvailable).toBe(true)
+    expect(slot1000WithBuffer?.isAvailable).toBe(false)
+  })
 })
 
 // ─── getAvailableSlots ───────────────────────────────────────────────────────

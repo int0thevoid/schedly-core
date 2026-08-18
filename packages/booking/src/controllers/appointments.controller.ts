@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express'
+import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { confirmAttendancePageTemplate } from '@schedly/notifications'
 import { prisma } from '../lib/prisma.js'
@@ -12,7 +13,35 @@ import {
   type AppointmentWithService,
 } from '../lib/notification-data.js'
 import { getEmailService } from '../lib/email-service.js'
-import type { Appointment, Service } from '../generated/prisma/index.js'
+import { Prisma, type Appointment, type Service } from '../generated/prisma/index.js'
+
+// P2034 = "Transaction failed due to a write conflict or a deadlock. Please retry
+// your transaction" — se compara por código en vez de `instanceof` porque el tipo
+// exportado por el cliente generado no siempre se resuelve bien para narrowing.
+function isSerializationConflictError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err && (err as { code: unknown }).code === 'P2034'
+}
+
+/**
+ * Corre `fn` en una transacción Serializable, reintentando si Postgres aborta
+ * por conflicto de escritura (P2034) — puede pasar bajo concurrencia real
+ * incluso cuando el chequeo de solapamiento dentro de la transacción no
+ * detectó nada, porque otra transacción concurrente reservó el mismo
+ * horario en simultáneo. Sin esto, dos reservas para el mismo horario
+ * podían quedar ambas activas (ver docs/deuda-tecnica.md).
+ */
+async function runSerializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>, attempts = 3): Promise<T> {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await prisma.$transaction(fn, { isolationLevel: 'Serializable' })
+    } catch (err) {
+      const isSerializationConflict = isSerializationConflictError(err)
+      if (isSerializationConflict && attempt < attempts) continue
+      throw err
+    }
+  }
+  throw new Error('unreachable')
+}
 
 const createSchema = z.object({
   serviceId: z.string().min(1),
@@ -44,7 +73,9 @@ function isSameCalendarDay(a: Date, b: Date): boolean {
 }
 
 function generateToken(): string {
-  return `tok_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
+  // Es la única credencial para cancelar/reagendar una cita sin login vía link
+  // público — debe ser criptográficamente segura, no adivinable.
+  return `tok_${randomUUID()}`
 }
 
 function calculateTokenExpiry(startDateTime: Date): Date {
@@ -86,7 +117,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
   const tokenExpiresAt = calculateTokenExpiry(start)
 
   try {
-    const appointment = await prisma.$transaction(async (tx) => {
+    const appointment = await runSerializable(async (tx) => {
       const conflict = await tx.appointment.findFirst({
         where: {
           professionalId,
@@ -132,6 +163,10 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
     void sendNewAppointmentEmails(appointment, service)
   } catch (err) {
     if (err instanceof Error && err.message === 'SLOT_TAKEN') {
+      fail(res, 'Slot is no longer available', 409)
+      return
+    }
+    if (isSerializationConflictError(err)) {
       fail(res, 'Slot is no longer available', 409)
       return
     }
@@ -275,7 +310,7 @@ export async function rescheduleByToken(req: Request, res: Response): Promise<vo
   const newTokenExpiresAt = calculateTokenExpiry(newStart)
 
   try {
-    const newAppointment = await prisma.$transaction(async (tx) => {
+    const newAppointment = await runSerializable(async (tx) => {
       const conflict = await tx.appointment.findFirst({
         where: {
           professionalId: originalAppointment.professionalId,
@@ -320,6 +355,10 @@ export async function rescheduleByToken(req: Request, res: Response): Promise<vo
     void sendRescheduleEmail(originalAppointment, newAppointment)
   } catch (err) {
     if (err instanceof Error && err.message === 'SLOT_TAKEN') {
+      fail(res, 'Slot is no longer available', 409)
+      return
+    }
+    if (isSerializationConflictError(err)) {
       fail(res, 'Slot is no longer available', 409)
       return
     }

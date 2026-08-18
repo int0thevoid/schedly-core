@@ -8,7 +8,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return `Bearer ${jwt.sign({ role: 'admin' }, 'dev-secret')}`
+  return jwt.sign({ role: 'admin' }, 'dev-secret')
 }
 
 const PROFESSIONAL = {
@@ -39,7 +39,7 @@ describe('GET /api/admin/transfer-config', () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     const res = await request(app)
       .get('/api/admin/transfer-config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
     expect(res.body.data).toHaveProperty('banks')
@@ -54,7 +54,7 @@ describe('GET /api/admin/transfer-config', () => {
     prismaMock.professional.findUnique.mockResolvedValue(pro)
     const res = await request(app)
       .get('/api/admin/transfer-config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data.transferRut).toBe('12.345.678-9')
     expect(res.body.data.transferBank).toBe('estado')
@@ -64,7 +64,7 @@ describe('GET /api/admin/transfer-config', () => {
     prismaMock.professional.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .get('/api/admin/transfer-config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(404)
   })
 
@@ -88,7 +88,7 @@ describe('PATCH /api/admin/transfer-config', () => {
     })
     const res = await request(app)
       .patch('/api/admin/transfer-config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({
         transferRut: '12.345.678-9',
         transferBank: 'estado',
@@ -107,7 +107,7 @@ describe('PATCH /api/admin/transfer-config', () => {
     prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, transferRut: '11.111.111-1' })
     const res = await request(app)
       .patch('/api/admin/transfer-config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ transferRut: '11.111.111-1' })
     expect(res.status).toBe(200)
     expect(res.body.data.transferRut).toBe('11.111.111-1')
@@ -116,7 +116,7 @@ describe('PATCH /api/admin/transfer-config', () => {
   it('retorna 400 si el banco no es un código válido', async () => {
     const res = await request(app)
       .patch('/api/admin/transfer-config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ transferBank: 'banco_invalido' })
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
@@ -125,7 +125,7 @@ describe('PATCH /api/admin/transfer-config', () => {
   it('retorna 400 si el tipo de cuenta no es válido', async () => {
     const res = await request(app)
       .patch('/api/admin/transfer-config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ transferAccountType: 'debito' })
     expect(res.status).toBe(400)
   })
@@ -133,7 +133,7 @@ describe('PATCH /api/admin/transfer-config', () => {
   it('retorna 400 si el email no es válido', async () => {
     const res = await request(app)
       .patch('/api/admin/transfer-config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ transferEmail: 'noesvalido' })
     expect(res.status).toBe(400)
   })
@@ -141,7 +141,7 @@ describe('PATCH /api/admin/transfer-config', () => {
   it('retorna 400 con body vacío', async () => {
     const res = await request(app)
       .patch('/api/admin/transfer-config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({})
     expect(res.status).toBe(400)
   })
@@ -150,7 +150,7 @@ describe('PATCH /api/admin/transfer-config', () => {
     prismaMock.professional.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/transfer-config')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ transferRut: '12.345.678-9' })
     expect(res.status).toBe(404)
   })

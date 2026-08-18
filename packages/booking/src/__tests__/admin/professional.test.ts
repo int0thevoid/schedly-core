@@ -9,7 +9,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return `Bearer ${jwt.sign({ role: 'admin' }, 'dev-secret')}`
+  return jwt.sign({ role: 'admin' }, 'dev-secret')
 }
 
 const PROFESSIONAL = {
@@ -46,7 +46,7 @@ describe('PATCH /api/admin/professional', () => {
 
     const res = await request(app)
       .patch('/api/admin/professional')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ name: 'Stefany O. Alfaro' })
 
     expect(res.status).toBe(200)
@@ -62,7 +62,7 @@ describe('PATCH /api/admin/professional', () => {
 
     const res = await request(app)
       .patch('/api/admin/professional')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ phone: '+56999999999' })
 
     expect(res.status).toBe(200)
@@ -72,7 +72,7 @@ describe('PATCH /api/admin/professional', () => {
   it('retorna 400 si el body está vacío', async () => {
     const res = await request(app)
       .patch('/api/admin/professional')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({})
     expect(res.status).toBe(400)
   })
@@ -80,7 +80,7 @@ describe('PATCH /api/admin/professional', () => {
   it('retorna 400 si el nombre es string vacío', async () => {
     const res = await request(app)
       .patch('/api/admin/professional')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ name: '' })
     expect(res.status).toBe(400)
   })
@@ -89,7 +89,7 @@ describe('PATCH /api/admin/professional', () => {
     prismaMock.professional.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/professional')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ name: 'Nuevo Nombre' })
     expect(res.status).toBe(404)
   })
@@ -111,7 +111,7 @@ describe('POST /api/admin/professional/change-password', () => {
 
     const res = await request(app)
       .post('/api/admin/professional/change-password')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ currentPassword: 'password123', newPassword: 'newPassword456' })
 
     expect(res.status).toBe(200)
@@ -126,7 +126,7 @@ describe('POST /api/admin/professional/change-password', () => {
 
     const res = await request(app)
       .post('/api/admin/professional/change-password')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ currentPassword: 'wrongPassword', newPassword: 'newPassword456' })
 
     expect(res.status).toBe(401)
@@ -136,7 +136,7 @@ describe('POST /api/admin/professional/change-password', () => {
   it('retorna 400 si la nueva contraseña tiene menos de 8 caracteres', async () => {
     const res = await request(app)
       .post('/api/admin/professional/change-password')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ currentPassword: 'password123', newPassword: 'short' })
     expect(res.status).toBe(400)
   })
@@ -144,7 +144,7 @@ describe('POST /api/admin/professional/change-password', () => {
   it('retorna 400 si falta currentPassword', async () => {
     const res = await request(app)
       .post('/api/admin/professional/change-password')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ newPassword: 'newPassword456' })
     expect(res.status).toBe(400)
   })
@@ -153,7 +153,7 @@ describe('POST /api/admin/professional/change-password', () => {
     prismaMock.professional.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .post('/api/admin/professional/change-password')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ currentPassword: 'password123', newPassword: 'newPassword456' })
     expect(res.status).toBe(404)
   })
@@ -170,7 +170,7 @@ describe('POST /api/admin/professional/change-password', () => {
 
     const res = await request(app)
       .post('/api/admin/professional/change-password')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ currentPassword: 'password123', newPassword: 'newPassword456' })
 
     expect(res.status).toBe(401)

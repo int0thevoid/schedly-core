@@ -8,7 +8,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return `Bearer ${jwt.sign({ role: 'admin' }, 'dev-secret')}`
+  return jwt.sign({ role: 'admin' }, 'dev-secret')
 }
 
 const SERVICE = {
@@ -34,7 +34,7 @@ describe('GET /api/admin/services', () => {
   it('returns all services including inactive', async () => {
     const inactive = { ...SERVICE, id: 's2', isActive: false }
     prismaMock.service.findMany.mockResolvedValue([SERVICE, inactive])
-    const res = await request(app).get('/api/admin/services').set('Authorization', token())
+    const res = await request(app).get('/api/admin/services').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toHaveLength(2)
     expect(prismaMock.service.findMany).toHaveBeenCalledWith(
@@ -60,7 +60,7 @@ describe('POST /api/admin/services', () => {
     }
     const res = await request(app)
       .post('/api/admin/services')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send(body)
     expect(res.status).toBe(201)
     expect(res.body.data.name).toBe('Terapia individual')
@@ -74,7 +74,7 @@ describe('POST /api/admin/services', () => {
   it('returns 400 for missing name', async () => {
     const res = await request(app)
       .post('/api/admin/services')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ description: 'X', duration: 50, price: 30000, modality: 'online' })
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
@@ -83,7 +83,7 @@ describe('POST /api/admin/services', () => {
   it('returns 400 for invalid modality', async () => {
     const res = await request(app)
       .post('/api/admin/services')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ name: 'X', description: 'X', duration: 50, price: 30000, modality: 'unknown' })
     expect(res.status).toBe(400)
   })
@@ -91,7 +91,7 @@ describe('POST /api/admin/services', () => {
   it('returns 400 for zero duration', async () => {
     const res = await request(app)
       .post('/api/admin/services')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ name: 'X', description: 'X', duration: 0, price: 30000, modality: 'online' })
     expect(res.status).toBe(400)
   })
@@ -103,7 +103,7 @@ describe('PATCH /api/admin/services/:id', () => {
     prismaMock.service.update.mockResolvedValue({ ...SERVICE, price: 35000 })
     const res = await request(app)
       .patch('/api/admin/services/s1')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ price: 35000 })
     expect(res.status).toBe(200)
     expect(res.body.data.price).toBe(35000)
@@ -116,7 +116,7 @@ describe('PATCH /api/admin/services/:id', () => {
     prismaMock.service.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/services/bad')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ price: 35000 })
     expect(res.status).toBe(404)
   })
@@ -128,7 +128,7 @@ describe('PATCH /api/admin/services/:id/toggle', () => {
     prismaMock.service.update.mockResolvedValue({ ...SERVICE, isActive: false })
     const res = await request(app)
       .patch('/api/admin/services/s1/toggle')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ isActive: false })
     expect(res.status).toBe(200)
     expect(res.body.data.isActive).toBe(false)
@@ -141,7 +141,7 @@ describe('PATCH /api/admin/services/:id/toggle', () => {
   it('returns 400 for missing isActive field', async () => {
     const res = await request(app)
       .patch('/api/admin/services/s1/toggle')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({})
     expect(res.status).toBe(400)
   })
@@ -150,7 +150,7 @@ describe('PATCH /api/admin/services/:id/toggle', () => {
     prismaMock.service.findUnique.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/services/bad/toggle')
-      .set('Authorization', token())
+      .set('Cookie', `auth_token=${token()}`)
       .send({ isActive: false })
     expect(res.status).toBe(404)
   })

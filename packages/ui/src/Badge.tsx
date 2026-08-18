@@ -12,8 +12,8 @@ const variantStyles: Record<BadgeVariant, CSSProperties> = {
   primary: { backgroundColor: 'var(--schedly-color-primary-subtle, #e2eadd)', color: 'var(--schedly-color-primary-dark, #466840)' },
   accent:  { backgroundColor: 'var(--schedly-color-accent-light, #fae5db)',   color: 'var(--schedly-color-accent-dark, #b8422a)' },
   neutral: { backgroundColor: 'var(--schedly-color-surface-elevated, #f2ebd7)', color: 'var(--schedly-color-text, #47453c)' },
-  success: { backgroundColor: '#dcfce7', color: '#15803d' },
-  warning: { backgroundColor: '#fef3c7', color: '#b45309' },
+  success: { backgroundColor: 'var(--schedly-color-success, #dcfce7)', color: 'var(--schedly-color-success-dark, #15803d)' },
+  warning: { backgroundColor: 'var(--schedly-color-warning, #fef3c7)', color: 'var(--schedly-color-warning-dark, #b45309)' },
 }
 
 export function Badge({ variant = 'primary', children, className = '' }: BadgeProps) {
