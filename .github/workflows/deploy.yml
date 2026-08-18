@@ -1,0 +1,38 @@
+name: Deploy to test server
+
+# Corre en el runner self-hosted instalado en el servidor de pruebas
+# (stefanyoa-test.int0thesrv.cl). Se dispara solo cuando algo se mezcla
+# a develop, nunca en PRs — así el runner nunca ejecuta código de una
+# rama que todavía no fue aprobada.
+on:
+  push:
+    branches: [develop]
+
+concurrency:
+  group: deploy-schedly-core
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Actualizar código (fast-forward only)
+        run: |
+          cd /home/int0/schedly-core
+          git fetch origin develop
+          git checkout develop
+          git merge --ff-only origin/develop
+
+      - name: Instalar dependencias (pnpm)
+        run: |
+          cd /home/int0/schedly-core
+          pnpm install --frozen-lockfile
+
+      - name: Migraciones y cliente Prisma
+        run: |
+          cd /home/int0/schedly-core/packages/booking
+          npx prisma migrate deploy
+          npx prisma generate
+
+      - name: Reiniciar backend (pm2)
+        run: pm2 restart schedly-booking
