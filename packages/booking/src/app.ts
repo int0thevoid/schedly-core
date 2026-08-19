@@ -26,6 +26,7 @@ const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://192.168.1.75:5173',
   'https://stefanyoa-test.int0thesrv.cl',
+  'https://stefanyosorio-test.int0thesrv.cl',
 ]
 
 const app = express()
