@@ -18,19 +18,19 @@ jobs:
     steps:
       - name: Actualizar código (fast-forward only)
         run: |
-          cd /home/int0/schedly-core
+          cd /opt/projects/stefany-osorio-web/schedly-core
           git fetch origin develop
           git checkout develop
           git merge --ff-only origin/develop
 
       - name: Instalar dependencias (pnpm)
         run: |
-          cd /home/int0/schedly-core
+          cd /opt/projects/stefany-osorio-web/schedly-core
           pnpm install --frozen-lockfile
 
       - name: Migraciones y cliente Prisma
         run: |
-          cd /home/int0/schedly-core/packages/booking
+          cd /opt/projects/stefany-osorio-web/schedly-core/packages/booking
           npx prisma migrate deploy
           npx prisma generate
 
