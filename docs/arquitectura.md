@@ -58,4 +58,4 @@ gestión de servicios y configuración.
 
 | Proyecto | Estado | Ruta local |
 |---|---|---|
-| stefany-osorio-web | Activo | `file:/home/int0/schedly-core/packages/ui` |
+| stefany-osorio-web | Activo | `file:/opt/projects/schedly-core/packages/ui` |
