@@ -29,6 +29,11 @@ const PROFESSIONAL = {
   timezone: 'UTC',
   dailyDigestTime: '16:00',
   lastDailyDigestSentDate: null as string | null,
+  transferRut: '12.345.678-5',
+  transferBank: 'estado',
+  transferAccountType: 'vista',
+  transferAccountNumber: '12345678',
+  transferEmail: 'pagos@test.com',
 } as unknown as Professional
 
 const SERVICE = {
@@ -52,7 +57,7 @@ function makeAppointment(overrides: Record<string, unknown>) {
     modality: 'online',
     status: 'confirmed',
     paymentStatus: 'paid',
-    reminder2hSentAt: null,
+    reminderSentAt: null,
     notes: null,
     service: SERVICE,
     appointmentToken: 'tok_abc123',
@@ -83,11 +88,11 @@ describe('runNotificationsJob', () => {
     expect(prismaMock.appointment.findMany).not.toHaveBeenCalled()
   })
 
-  it('sends a 2h reminder and marks reminder2hSentAt', async () => {
+  it('sends a same_day reminder (2h before) and marks reminderSentAt', async () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     const appointment = makeAppointment({
-      startDateTime: new Date('2026-06-15T10:00:00Z'),
-      endDateTime: new Date('2026-06-15T10:45:00Z'),
+      startDateTime: new Date('2026-06-15T09:30:00Z'),
+      endDateTime: new Date('2026-06-15T10:15:00Z'),
     })
     prismaMock.appointment.findMany.mockResolvedValue([appointment])
 
@@ -95,15 +100,52 @@ describe('runNotificationsJob', () => {
 
     expect(sendAppointmentReminder).toHaveBeenCalledWith(
       'ana@test.com',
-      expect.objectContaining({ clientName: 'Ana', serviceName: 'Primera visita' }),
+      expect.objectContaining({ clientName: 'Ana', serviceName: 'Primera visita', timing: 'same_day' }),
     )
     expect(prismaMock.appointment.update).toHaveBeenCalledWith({
       where: { id: 'apt1' },
-      data: { reminder2hSentAt: new Date('2026-06-15T08:00:00Z') },
+      data: { reminderSentAt: new Date('2026-06-15T08:00:00Z') },
     })
   })
 
-  it('queries only active appointments within 2h and without reminder already sent', async () => {
+  it('sends a day_before reminder for a same-day-tomorrow appointment once past 10:00', async () => {
+    vi.setSystemTime(new Date('2026-06-15T10:30:00Z'))
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    const appointment = makeAppointment({
+      startDateTime: new Date('2026-06-16T09:00:00Z'),
+      endDateTime: new Date('2026-06-16T09:45:00Z'),
+    })
+    prismaMock.appointment.findMany.mockResolvedValue([appointment])
+
+    await runNotificationsJob()
+
+    expect(sendAppointmentReminder).toHaveBeenCalledWith(
+      'ana@test.com',
+      expect.objectContaining({ timing: 'day_before' }),
+    )
+  })
+
+  it('includes the payment-pending nudge when the appointment is unpaid', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    const appointment = makeAppointment({
+      startDateTime: new Date('2026-06-15T09:30:00Z'),
+      paymentStatus: 'unpaid',
+    })
+    prismaMock.appointment.findMany.mockResolvedValue([appointment])
+
+    await runNotificationsJob()
+
+    expect(sendAppointmentReminder).toHaveBeenCalledWith(
+      'ana@test.com',
+      expect.objectContaining({
+        paymentStatus: 'unpaid',
+        price: 30000,
+        transferData: expect.objectContaining({ bank: 'Banco Estado' }),
+      }),
+    )
+  })
+
+  it('queries only active appointments without a reminder already sent', async () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     prismaMock.appointment.findMany.mockResolvedValue([])
 
@@ -113,15 +155,25 @@ describe('runNotificationsJob', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           status: { not: 'cancelled' },
-          reminder2hSentAt: null,
+          reminderSentAt: null,
         }),
       }),
     )
   })
 
-  it('does not send reminder when no appointments are returned (outside window, already sent, or cancelled)', async () => {
+  it('does not send a reminder when no appointments are returned', async () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     prismaMock.appointment.findMany.mockResolvedValue([])
+
+    await runNotificationsJob()
+
+    expect(sendAppointmentReminder).not.toHaveBeenCalled()
+  })
+
+  it('does not send a reminder for an appointment outside both windows (more than a day out, more than 2h into today)', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    const appointment = makeAppointment({ startDateTime: new Date('2026-06-15T23:00:00Z') })
+    prismaMock.appointment.findMany.mockResolvedValue([appointment])
 
     await runNotificationsJob()
 

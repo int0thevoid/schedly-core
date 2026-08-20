@@ -6,16 +6,18 @@ export interface AppointmentForReminder {
   id: string
   startDateTime: Date
   status: string
-  paymentStatus: string
   reminderSentAt: Date | null
-  reminder2hSentAt: Date | null
-  paymentReminderSentAt: Date | null
+}
+
+export type ReminderTiming = 'day_before' | 'same_day'
+
+export interface AppointmentNeedingReminder {
+  appointment: AppointmentForReminder
+  timing: ReminderTiming
 }
 
 export interface AppointmentsNeedingReminder {
-  reminder24h: AppointmentForReminder[]
-  reminder2h: AppointmentForReminder[]
-  paymentReminder: AppointmentForReminder[]
+  reminder: AppointmentNeedingReminder[]
 }
 
 interface LocalDateParts {
@@ -64,47 +66,36 @@ function isNextLocalDay(a: Date, b: Date, timezone: string): boolean {
 }
 
 /**
- * Determina qué citas necesitan recordatorios en este momento, según `now` y `timezone`.
- * - reminder24h: citas de mañana (calendario local) sin recordatorio 24h enviado.
- * - reminder2h: citas que empiezan dentro de las próximas 2 horas sin recordatorio enviado.
- * - paymentReminder: citas sin pago, a las 10:00 del día anterior o a las 20:00 del mismo día,
- *   sin haber enviado ya un recordatorio de pago ese mismo día.
+ * Determina qué citas necesitan el recordatorio único en este momento, según `now` y `timezone`.
+ * Es un solo recordatorio por cita (no varios), con dos ventanas posibles de disparo:
+ * - `day_before`: a partir de las 10:00 del día calendario anterior a la cita.
+ * - `same_day`: dentro de las 2 horas previas al inicio, para citas cuyo día calendario es hoy —
+ *   cubre tanto las agendadas el mismo día (nunca tuvieron ventana de "día anterior") como una red
+ *   de seguridad si por algún motivo la ventana de "día anterior" no llegó a dispararse.
  */
 export function getAppointmentsNeedingReminder(
   appointments: AppointmentForReminder[],
   now: Date,
   timezone: string
 ): AppointmentsNeedingReminder {
-  const reminder24h: AppointmentForReminder[] = []
-  const reminder2h: AppointmentForReminder[] = []
-  const paymentReminder: AppointmentForReminder[] = []
-
+  const reminder: AppointmentNeedingReminder[] = []
   const nowParts = getLocalDateParts(now, timezone)
 
   for (const appointment of appointments) {
     if (!ACTIVE_STATUSES.includes(appointment.status)) continue
+    if (appointment.reminderSentAt !== null) continue
 
     const msUntilStart = appointment.startDateTime.getTime() - now.getTime()
 
-    if (appointment.reminderSentAt === null && isNextLocalDay(appointment.startDateTime, now, timezone)) {
-      reminder24h.push(appointment)
-    }
+    const dayBeforeWindowOpen = nowParts.hour >= 10 && isNextLocalDay(appointment.startDateTime, now, timezone)
+    const sameDayWindowOpen = isSameLocalDay(appointment.startDateTime, now, timezone) && msUntilStart > 0 && msUntilStart <= TWO_HOURS_MS
 
-    if (appointment.reminder2hSentAt === null && msUntilStart > 0 && msUntilStart <= TWO_HOURS_MS) {
-      reminder2h.push(appointment)
-    }
-
-    if (appointment.paymentStatus === 'unpaid') {
-      const dayBeforeWindowOpen = nowParts.hour >= 10 && isNextLocalDay(appointment.startDateTime, now, timezone)
-      const sameDayWindowOpen = nowParts.hour >= 20 && isSameLocalDay(appointment.startDateTime, now, timezone)
-      const alreadySentToday =
-        appointment.paymentReminderSentAt !== null && isSameLocalDay(appointment.paymentReminderSentAt, now, timezone)
-
-      if ((dayBeforeWindowOpen || sameDayWindowOpen) && !alreadySentToday) {
-        paymentReminder.push(appointment)
-      }
+    if (dayBeforeWindowOpen) {
+      reminder.push({ appointment, timing: 'day_before' })
+    } else if (sameDayWindowOpen) {
+      reminder.push({ appointment, timing: 'same_day' })
     }
   }
 
-  return { reminder24h, reminder2h, paymentReminder }
+  return { reminder }
 }

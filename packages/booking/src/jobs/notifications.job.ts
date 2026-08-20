@@ -1,12 +1,16 @@
-import { EmailService } from '@schedly/notifications'
+import { EmailService, getAppointmentsNeedingReminder, type AppointmentForReminder } from '@schedly/notifications'
 import { prisma } from '../lib/prisma.js'
 import { buildAppointmentReminderData, buildDailyDigestData, formatAppointmentDate, type AppointmentWithService } from '../lib/notification-data.js'
 import { addDaysToDateStr, dayRangeInTZ, nowMinutesInTZ, timeStrToMinutes, todayInTZ } from '../lib/date.js'
 import type { Professional } from '../generated/prisma/index.js'
 
-const TWO_HOURS_MS = 2 * 60 * 60 * 1000
 const DIGEST_WINDOW_MINUTES = 15
 
+/**
+ * Recordatorio único por cita: a las 10:00 del día calendario anterior, o 2 horas antes si la cita
+ * es hoy (agendada el mismo día, sin ventana de "día anterior" disponible). Incluye el aviso de pago
+ * pendiente + link de WhatsApp cuando corresponde (ver buildAppointmentReminderData).
+ */
 export async function runNotificationsJob(): Promise<void> {
   const professionalId = process.env.PROFESSIONAL_ID ?? ''
   const professional = await prisma.professional.findUnique({ where: { id: professionalId } })
@@ -16,27 +20,35 @@ export async function runNotificationsJob(): Promise<void> {
   }
 
   const now = new Date()
-  const windowEnd = new Date(now.getTime() + TWO_HOURS_MS)
+  const tomorrow = addDaysToDateStr(todayInTZ(professional.timezone), 1)
+  const windowEnd = dayRangeInTZ(tomorrow, professional.timezone).lte
 
   const appointments = await prisma.appointment.findMany({
     where: {
       professionalId,
       status: { not: 'cancelled' },
       startDateTime: { gt: now, lte: windowEnd },
-      reminder2hSentAt: null,
+      reminderSentAt: null,
     },
     include: { service: true },
   })
 
+  const { reminder } = getAppointmentsNeedingReminder(
+    appointments as unknown as AppointmentForReminder[],
+    now,
+    professional.timezone,
+  )
+
   const emailService = new EmailService()
 
-  for (const appointment of appointments) {
+  for (const { appointment, timing } of reminder) {
+    const fullAppointment = appointments.find(a => a.id === appointment.id) as AppointmentWithService
     try {
-      const data = buildAppointmentReminderData(appointment as AppointmentWithService, professional)
-      await emailService.sendAppointmentReminder(appointment.clientEmail, data)
-      await prisma.appointment.update({ where: { id: appointment.id }, data: { reminder2hSentAt: now } })
+      const data = buildAppointmentReminderData(fullAppointment, professional, timing)
+      await emailService.sendAppointmentReminder(fullAppointment.clientEmail, data)
+      await prisma.appointment.update({ where: { id: appointment.id }, data: { reminderSentAt: now } })
     } catch (err) {
-      console.error(`[notifications] failed to send 2h reminder for appointment ${appointment.id}`, err)
+      console.error(`[notifications] failed to send reminder for appointment ${appointment.id}`, err)
     }
   }
 }

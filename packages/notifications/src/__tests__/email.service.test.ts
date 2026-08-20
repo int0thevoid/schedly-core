@@ -48,6 +48,17 @@ const REMINDER_DATA: AppointmentReminderData = {
   googleCalendarUrl: 'https://calendar.google.com/render?action=TEMPLATE',
   startDateTime: new Date('2026-07-15T10:00:00.000Z'),
   endDateTime: new Date('2026-07-15T10:45:00.000Z'),
+  timing: 'same_day',
+  professionalPhone: '+56966898588',
+  paymentStatus: 'paid',
+  price: 30000,
+  transferData: {
+    rut: '12.345.678-5',
+    bank: 'Banco Estado',
+    accountType: 'Cuenta Vista / RUT',
+    accountNumber: '12345678',
+    email: 'pagos@test.com',
+  },
 }
 
 const MODIFIED_DATA: AppointmentModifiedData = {

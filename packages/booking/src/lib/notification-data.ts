@@ -7,9 +7,26 @@ import type {
   ProfessionalNewBookingData,
   DailyDigestAppointment,
   DailyDigestData,
+  ReminderTiming,
+  TransferData,
 } from '@schedly/notifications'
 import type { Appointment, Professional, Service } from '../generated/prisma/index.js'
 import { generateGoogleCalendarUrl } from '@schedly/notifications'
+import { getBankName, ACCOUNT_TYPES } from '../data/banks.js'
+
+function getAccountTypeName(code: string): string {
+  return ACCOUNT_TYPES.find(t => t.code === code)?.name ?? code
+}
+
+function buildTransferData(professional: Professional): TransferData {
+  return {
+    rut: professional.transferRut ?? '',
+    bank: professional.transferBank ? getBankName(professional.transferBank) : '',
+    accountType: professional.transferAccountType ? getAccountTypeName(professional.transferAccountType) : '',
+    accountNumber: professional.transferAccountNumber ?? '',
+    email: professional.transferEmail ?? '',
+  }
+}
 
 export type AppointmentWithService = Appointment & { service: Service }
 
@@ -101,6 +118,7 @@ export function buildAppointmentConfirmationData(
 export function buildAppointmentReminderData(
   appointment: AppointmentWithService,
   professional: Professional,
+  timing: ReminderTiming,
 ): AppointmentReminderData {
   const modality = toModality(appointment.modality)
   return {
@@ -114,6 +132,11 @@ export function buildAppointmentReminderData(
     googleCalendarUrl: buildGoogleCalendarUrl(appointment, professional),
     startDateTime: appointment.startDateTime,
     endDateTime: appointment.endDateTime,
+    timing,
+    professionalPhone: professional.phone ?? '',
+    paymentStatus: appointment.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+    price: appointment.service.price,
+    transferData: buildTransferData(professional),
   }
 }
 
