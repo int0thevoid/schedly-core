@@ -8,7 +8,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return jwt.sign({ role: 'admin' }, 'dev-secret')
+  return jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'dev-secret')
 }
 
 const PROFESSIONAL = {

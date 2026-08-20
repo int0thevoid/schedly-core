@@ -8,7 +8,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return jwt.sign({ role: 'admin' }, 'dev-secret')
+  return jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'dev-secret')
 }
 
 const SERVICE = {
@@ -99,7 +99,7 @@ describe('POST /api/admin/services', () => {
 
 describe('PATCH /api/admin/services/:id', () => {
   it('updates service fields', async () => {
-    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.service.findFirst.mockResolvedValue(SERVICE)
     prismaMock.service.update.mockResolvedValue({ ...SERVICE, price: 35000 })
     const res = await request(app)
       .patch('/api/admin/services/s1')
@@ -107,24 +107,38 @@ describe('PATCH /api/admin/services/:id', () => {
       .send({ price: 35000 })
     expect(res.status).toBe(200)
     expect(res.body.data.price).toBe(35000)
+    expect(prismaMock.service.findFirst).toHaveBeenCalledWith({ where: { id: 's1', professionalId: 'pro1' } })
     expect(prismaMock.service.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 's1' } }),
     )
   })
 
   it('returns 404 when service not found', async () => {
-    prismaMock.service.findUnique.mockResolvedValue(null)
+    prismaMock.service.findFirst.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/services/bad')
       .set('Cookie', `auth_token=${token()}`)
       .send({ price: 35000 })
     expect(res.status).toBe(404)
   })
+
+  it('returns 404 for a service belonging to another professional (no cross-tenant access)', async () => {
+    // El servicio existe pero pertenece a otro profesional — findFirst filtra por professionalId del JWT y no lo encuentra.
+    prismaMock.service.findFirst.mockResolvedValue(null)
+    const otherToken = jwt.sign({ professionalId: 'pro2', role: 'admin' }, 'dev-secret')
+    const res = await request(app)
+      .patch('/api/admin/services/s1')
+      .set('Cookie', `auth_token=${otherToken}`)
+      .send({ price: 35000 })
+    expect(res.status).toBe(404)
+    expect(prismaMock.service.findFirst).toHaveBeenCalledWith({ where: { id: 's1', professionalId: 'pro2' } })
+    expect(prismaMock.service.update).not.toHaveBeenCalled()
+  })
 })
 
 describe('PATCH /api/admin/services/:id/toggle', () => {
   it('toggles isActive to false', async () => {
-    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.service.findFirst.mockResolvedValue(SERVICE)
     prismaMock.service.update.mockResolvedValue({ ...SERVICE, isActive: false })
     const res = await request(app)
       .patch('/api/admin/services/s1/toggle')
@@ -147,7 +161,7 @@ describe('PATCH /api/admin/services/:id/toggle', () => {
   })
 
   it('returns 404 when service not found', async () => {
-    prismaMock.service.findUnique.mockResolvedValue(null)
+    prismaMock.service.findFirst.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/services/bad/toggle')
       .set('Cookie', `auth_token=${token()}`)

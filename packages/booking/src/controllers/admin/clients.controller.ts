@@ -72,7 +72,7 @@ export async function getClient(req: Request, res: Response): Promise<void> {
 
 export async function getClientStats(req: Request, res: Response): Promise<void> {
   const { id } = req.params
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
 
   const client = await prisma.client.findUnique({ where: { id }, select: { email: true } })
   if (!client) {

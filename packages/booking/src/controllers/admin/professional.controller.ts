@@ -25,7 +25,7 @@ export async function updateProfessional(req: Request, res: Response): Promise<v
     return
   }
 
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const professional = await prisma.professional.findUnique({ where: { id: professionalId } })
   if (!professional) {
     fail(res, 'Professional not found', 404)
@@ -46,7 +46,7 @@ export async function changePassword(req: Request, res: Response): Promise<void>
     return
   }
 
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const professional = await prisma.professional.findUnique({ where: { id: professionalId } })
   if (!professional) {
     fail(res, 'Professional not found', 404)

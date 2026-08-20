@@ -20,7 +20,7 @@ const toggleSchema = z.object({
 })
 
 export async function listAdminServices(req: Request, res: Response): Promise<void> {
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const services = await prisma.service.findMany({
     where: { professionalId },
     orderBy: { name: 'asc' },
@@ -34,7 +34,7 @@ export async function createService(req: Request, res: Response): Promise<void> 
     fail(res, parsed.error.issues[0]?.message ?? 'Invalid body', 400)
     return
   }
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const service = await prisma.service.create({
     data: {
       professionalId,
@@ -52,7 +52,7 @@ export async function updateService(req: Request, res: Response): Promise<void> 
     return
   }
   const { id } = req.params
-  const existing = await prisma.service.findUnique({ where: { id } })
+  const existing = await prisma.service.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!existing) {
     fail(res, 'Service not found', 404)
     return
@@ -71,7 +71,7 @@ export async function toggleService(req: Request, res: Response): Promise<void> 
     return
   }
   const { id } = req.params
-  const existing = await prisma.service.findUnique({ where: { id } })
+  const existing = await prisma.service.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!existing) {
     fail(res, 'Service not found', 404)
     return

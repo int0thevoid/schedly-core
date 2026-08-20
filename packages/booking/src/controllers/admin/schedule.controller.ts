@@ -12,7 +12,7 @@ const createBlockSchema = z.object({
 })
 
 export async function listBlocks(req: Request, res: Response): Promise<void> {
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const blocks = await prisma.scheduleBlock.findMany({
     where: { professionalId },
     orderBy: { startDateTime: 'asc' },
@@ -28,7 +28,7 @@ export async function createBlock(req: Request, res: Response): Promise<void> {
   }
 
   const { title, startDateTime, endDateTime, recurrenceType, recurrenceEnd } = parsed.data
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
 
   const start = new Date(startDateTime)
   const end = new Date(endDateTime)
@@ -75,7 +75,7 @@ export async function createBlock(req: Request, res: Response): Promise<void> {
 
 export async function deleteBlock(req: Request, res: Response): Promise<void> {
   const { id } = req.params
-  const block = await prisma.scheduleBlock.findUnique({ where: { id } })
+  const block = await prisma.scheduleBlock.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!block) {
     fail(res, 'Block not found', 404)
     return

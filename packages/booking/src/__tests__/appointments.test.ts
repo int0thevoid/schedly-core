@@ -470,7 +470,7 @@ describe('POST /api/appointments — token generation', () => {
 })
 
 function adminToken() {
-  return jwt.sign({ role: 'admin' }, process.env.JWT_SECRET ?? 'dev-secret')
+  return jwt.sign({ professionalId: 'pro1', role: 'admin' }, process.env.JWT_SECRET ?? 'dev-secret')
 }
 
 describe('Admin routes — auth guard', () => {

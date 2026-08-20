@@ -25,7 +25,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return jwt.sign({ role: 'admin' }, 'dev-secret')
+  return jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'dev-secret')
 }
 
 const APT = {
@@ -169,7 +169,7 @@ describe('GET /api/admin/appointments/weekly', () => {
 
 describe('PATCH /api/admin/appointments/:id/status', () => {
   it('updates status to confirmed', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.appointment.update.mockResolvedValue({ ...APT, status: 'confirmed' })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/status')
@@ -188,7 +188,7 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
   })
 
   it('returns 404 when not found', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(null)
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/appointments/bad/status')
       .set('Cookie', `auth_token=${token()}`)
@@ -196,8 +196,21 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
     expect(res.status).toBe(404)
   })
 
+  it('returns 404 for an appointment belonging to another professional (no cross-tenant access)', async () => {
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    const otherToken = jwt.sign({ professionalId: 'pro2', role: 'admin' }, process.env.JWT_SECRET ?? 'dev-secret')
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/status')
+      .set('Cookie', `auth_token=${otherToken}`)
+      .send({ status: 'confirmed' })
+    expect(res.status).toBe(404)
+    expect(prismaMock.appointment.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'a1', professionalId: 'pro2' } }),
+    )
+  })
+
   it('sends a cancellation email to the patient when status is set to cancelled', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.appointment.update.mockResolvedValue({ ...APT, status: 'cancelled' })
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     sendAppointmentCancelledByPatientMock.mockResolvedValue(undefined)
@@ -215,7 +228,7 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
   })
 
   it('does not send a cancellation email when status is set to confirmed', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.appointment.update.mockResolvedValue({ ...APT, status: 'confirmed' })
 
     const res = await request(app)
@@ -228,7 +241,7 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
   })
 
   it('does not fail the request when the cancellation email fails to send', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.appointment.update.mockResolvedValue({ ...APT, status: 'cancelled' })
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     sendAppointmentCancelledByPatientMock.mockRejectedValue(new Error('Resend error'))
@@ -245,7 +258,7 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
 
 describe('PATCH /api/admin/appointments/:id/payment', () => {
   it('marks as paid', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.appointment.update.mockResolvedValue({ ...APT, paymentStatus: 'paid', paymentAmount: 30000 })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/payment')
@@ -264,7 +277,7 @@ describe('PATCH /api/admin/appointments/:id/payment', () => {
   })
 
   it('saves paymentMethod when provided', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.appointment.update.mockResolvedValue({ ...APT, paymentStatus: 'paid', paymentAmount: 30000, paymentMethod: 'cash' })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/payment')
@@ -276,7 +289,7 @@ describe('PATCH /api/admin/appointments/:id/payment', () => {
 
   it('reverts to unpaid', async () => {
     const paid = { ...APT, paymentStatus: 'paid', paymentAmount: 30000, paymentMethod: 'transfer' }
-    prismaMock.appointment.findUnique.mockResolvedValue(paid)
+    prismaMock.appointment.findFirst.mockResolvedValue(paid)
     prismaMock.appointment.update.mockResolvedValue({ ...paid, paymentStatus: 'unpaid', paymentAmount: null, paymentMethod: null })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/payment')
@@ -345,7 +358,7 @@ describe('GET /api/admin/appointments/monthly', () => {
 
 describe('PATCH /api/admin/appointments/:id/attendance', () => {
   it('marks as attended', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.appointment.update.mockResolvedValue({ ...APT, attended: true })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/attendance')
@@ -356,7 +369,7 @@ describe('PATCH /api/admin/appointments/:id/attendance', () => {
   })
 
   it('marks as not attended', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue({ ...APT, attended: true })
+    prismaMock.appointment.findFirst.mockResolvedValue({ ...APT, attended: true })
     prismaMock.appointment.update.mockResolvedValue({ ...APT, attended: false })
     const res = await request(app)
       .patch('/api/admin/appointments/a1/attendance')
@@ -375,7 +388,7 @@ describe('PATCH /api/admin/appointments/:id/attendance', () => {
   })
 
   it('returns 404 when not found', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(null)
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/appointments/bad/attendance')
       .set('Cookie', `auth_token=${token()}`)
@@ -386,7 +399,7 @@ describe('PATCH /api/admin/appointments/:id/attendance', () => {
 
 describe('PATCH /api/admin/appointments/:id/notify-confirmation', () => {
   it('sends the appointment confirmation email again', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.service.findUnique.mockResolvedValue(APT.service)
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     sendAppointmentConfirmationMock.mockResolvedValue(undefined)
@@ -405,7 +418,7 @@ describe('PATCH /api/admin/appointments/:id/notify-confirmation', () => {
   })
 
   it('returns 404 when the appointment does not exist', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(null)
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
 
     const res = await request(app)
       .patch('/api/admin/appointments/bad/notify-confirmation')
@@ -417,7 +430,7 @@ describe('PATCH /api/admin/appointments/:id/notify-confirmation', () => {
   })
 
   it('returns 502 when the email fails to send', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.service.findUnique.mockResolvedValue(APT.service)
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     sendAppointmentConfirmationMock.mockRejectedValue(new Error('Resend error'))
@@ -433,7 +446,7 @@ describe('PATCH /api/admin/appointments/:id/notify-confirmation', () => {
 
 describe('PATCH /api/admin/appointments/:id/outcome', () => {
   it('updates outcome and returns the appointment', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(APT)
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.appointment.update.mockResolvedValue({ ...APT, outcome: 'attended' })
 
     const res = await request(app)
@@ -449,7 +462,7 @@ describe('PATCH /api/admin/appointments/:id/outcome', () => {
   })
 
   it('allows clearing the outcome by sending null', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue({ ...APT, outcome: 'attended' })
+    prismaMock.appointment.findFirst.mockResolvedValue({ ...APT, outcome: 'attended' })
     prismaMock.appointment.update.mockResolvedValue({ ...APT, outcome: null })
 
     const res = await request(app)
@@ -474,7 +487,7 @@ describe('PATCH /api/admin/appointments/:id/outcome', () => {
   })
 
   it('returns 404 when appointment not found', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(null)
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
 
     const res = await request(app)
       .patch('/api/admin/appointments/bad/outcome')

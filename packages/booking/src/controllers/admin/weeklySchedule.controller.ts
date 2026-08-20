@@ -18,7 +18,7 @@ const updateSchema = z.object({
 })
 
 export async function listWeeklySchedules(req: Request, res: Response): Promise<void> {
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const schedules = await prisma.weeklySchedule.findMany({
     where: { professionalId },
     orderBy: { dayOfWeek: 'asc' },
@@ -37,7 +37,7 @@ export async function createWeeklySchedule(req: Request, res: Response): Promise
     fail(res, 'endTime must be after startTime', 400)
     return
   }
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const schedule = await prisma.weeklySchedule.create({
     data: { professionalId, dayOfWeek, startTime, endTime, serviceIds: [] },
   })
@@ -51,7 +51,7 @@ export async function updateWeeklySchedule(req: Request, res: Response): Promise
     return
   }
   const { id } = req.params
-  const existing = await prisma.weeklySchedule.findUnique({ where: { id } })
+  const existing = await prisma.weeklySchedule.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!existing) {
     fail(res, 'Schedule not found', 404)
     return
@@ -74,7 +74,7 @@ export async function updateWeeklySchedule(req: Request, res: Response): Promise
 
 export async function deleteWeeklySchedule(req: Request, res: Response): Promise<void> {
   const { id } = req.params
-  const existing = await prisma.weeklySchedule.findUnique({ where: { id } })
+  const existing = await prisma.weeklySchedule.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!existing) {
     fail(res, 'Schedule not found', 404)
     return
