@@ -164,4 +164,20 @@ describe('GET /api/auth/me', () => {
       .set('Cookie', `auth_token=${authToken()}`)
     expect(res.status).toBe(404)
   })
+
+  it('returns 401 with an expired token (session expiration is enforced)', async () => {
+    const expiredToken = jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'dev-secret', { expiresIn: '-1s' })
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', `auth_token=${expiredToken}`)
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 401 with a token signed with a different secret', async () => {
+    const forgedToken = jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'wrong-secret')
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Cookie', `auth_token=${forgedToken}`)
+    expect(res.status).toBe(401)
+  })
 })
