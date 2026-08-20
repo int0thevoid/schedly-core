@@ -8,7 +8,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return jwt.sign({ role: 'admin' }, 'dev-secret')
+  return jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'dev-secret')
 }
 
 const BLOCK = {
@@ -79,7 +79,7 @@ describe('POST /api/admin/schedule/blocks', () => {
 
 describe('DELETE /api/admin/schedule/blocks/:id', () => {
   it('deletes an existing block', async () => {
-    prismaMock.scheduleBlock.findUnique.mockResolvedValue(BLOCK)
+    prismaMock.scheduleBlock.findFirst.mockResolvedValue(BLOCK)
     prismaMock.scheduleBlock.delete.mockResolvedValue(BLOCK)
     const res = await request(app).delete('/api/admin/schedule/blocks/blk1').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
@@ -87,8 +87,16 @@ describe('DELETE /api/admin/schedule/blocks/:id', () => {
   })
 
   it('returns 404 when block not found', async () => {
-    prismaMock.scheduleBlock.findUnique.mockResolvedValue(null)
+    prismaMock.scheduleBlock.findFirst.mockResolvedValue(null)
     const res = await request(app).delete('/api/admin/schedule/blocks/bad').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(404)
+  })
+
+  it('returns 404 for a block belonging to another professional (no cross-tenant access)', async () => {
+    prismaMock.scheduleBlock.findFirst.mockResolvedValue(null)
+    const otherToken = jwt.sign({ professionalId: 'pro2', role: 'admin' }, 'dev-secret')
+    const res = await request(app).delete('/api/admin/schedule/blocks/blk1').set('Cookie', `auth_token=${otherToken}`)
+    expect(res.status).toBe(404)
+    expect(prismaMock.scheduleBlock.findFirst).toHaveBeenCalledWith({ where: { id: 'blk1', professionalId: 'pro2' } })
   })
 })

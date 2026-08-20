@@ -50,7 +50,7 @@ export async function getPublicConfig(_req: Request, res: Response): Promise<voi
 }
 
 export async function getConfig(req: Request, res: Response): Promise<void> {
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const professional = await prisma.professional.findUnique({ where: { id: professionalId } })
   if (!professional) {
     fail(res, 'Professional not found', 404)
@@ -70,7 +70,7 @@ export async function updateConfig(req: Request, res: Response): Promise<void> {
     return
   }
 
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const professional = await prisma.professional.findUnique({ where: { id: professionalId } })
   if (!professional) {
     fail(res, 'Professional not found', 404)

@@ -55,7 +55,7 @@ export function logout(_req: Request, res: Response): void {
 }
 
 export async function me(req: Request, res: Response): Promise<void> {
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const professional = await prisma.professional.findUnique({ where: { id: professionalId } })
 
   if (!professional) {

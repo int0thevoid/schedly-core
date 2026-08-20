@@ -8,7 +8,7 @@ import { prismaMock, resetMocks } from '../helpers/prisma-mock.js'
 import app from '../../app.js'
 
 function token() {
-  return jwt.sign({ role: 'admin' }, 'dev-secret')
+  return jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'dev-secret')
 }
 
 const WS_MON = {
@@ -90,7 +90,7 @@ describe('POST /api/admin/schedule/weekly', () => {
 
 describe('PATCH /api/admin/schedule/weekly/:id', () => {
   it('updates startTime and endTime', async () => {
-    prismaMock.weeklySchedule.findUnique.mockResolvedValue(WS_MON)
+    prismaMock.weeklySchedule.findFirst.mockResolvedValue(WS_MON)
     prismaMock.weeklySchedule.update.mockResolvedValue({ ...WS_MON, startTime: '10:00', endTime: '19:00' })
     const res = await request(app)
       .patch('/api/admin/schedule/weekly/ws1')
@@ -105,12 +105,23 @@ describe('PATCH /api/admin/schedule/weekly/:id', () => {
   })
 
   it('returns 404 when schedule not found', async () => {
-    prismaMock.weeklySchedule.findUnique.mockResolvedValue(null)
+    prismaMock.weeklySchedule.findFirst.mockResolvedValue(null)
     const res = await request(app)
       .patch('/api/admin/schedule/weekly/bad')
       .set('Cookie', `auth_token=${token()}`)
       .send({ startTime: '10:00', endTime: '19:00' })
     expect(res.status).toBe(404)
+  })
+
+  it('returns 404 for a schedule belonging to another professional (no cross-tenant access)', async () => {
+    prismaMock.weeklySchedule.findFirst.mockResolvedValue(null)
+    const otherToken = jwt.sign({ professionalId: 'pro2', role: 'admin' }, 'dev-secret')
+    const res = await request(app)
+      .patch('/api/admin/schedule/weekly/ws1')
+      .set('Cookie', `auth_token=${otherToken}`)
+      .send({ startTime: '10:00', endTime: '19:00' })
+    expect(res.status).toBe(404)
+    expect(prismaMock.weeklySchedule.findFirst).toHaveBeenCalledWith({ where: { id: 'ws1', professionalId: 'pro2' } })
   })
 
   it('returns 400 for invalid time format', async () => {
@@ -124,7 +135,7 @@ describe('PATCH /api/admin/schedule/weekly/:id', () => {
 
 describe('DELETE /api/admin/schedule/weekly/:id', () => {
   it('deletes an existing day schedule', async () => {
-    prismaMock.weeklySchedule.findUnique.mockResolvedValue(WS_MON)
+    prismaMock.weeklySchedule.findFirst.mockResolvedValue(WS_MON)
     prismaMock.weeklySchedule.delete.mockResolvedValue(WS_MON)
     const res = await request(app)
       .delete('/api/admin/schedule/weekly/ws1')
@@ -134,7 +145,7 @@ describe('DELETE /api/admin/schedule/weekly/:id', () => {
   })
 
   it('returns 404 when schedule not found', async () => {
-    prismaMock.weeklySchedule.findUnique.mockResolvedValue(null)
+    prismaMock.weeklySchedule.findFirst.mockResolvedValue(null)
     const res = await request(app)
       .delete('/api/admin/schedule/weekly/bad')
       .set('Cookie', `auth_token=${token()}`)

@@ -59,7 +59,7 @@ export async function listWeeklyAppointments(req: Request, res: Response): Promi
   }
 
   const { startDate, endDate } = parsed.data
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
 
   const appointments = await prisma.appointment.findMany({
     where: {
@@ -96,7 +96,7 @@ export async function listMonthlyAppointments(req: Request, res: Response): Prom
 
   const year = Number(parsed.data.year)
   const month = Number(parsed.data.month)
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
 
   const firstDayStr = `${year}-${String(month).padStart(2, '0')}-01`
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
@@ -136,7 +136,7 @@ export async function listAdminAppointments(req: Request, res: Response): Promis
   }
 
   const { date, status, week } = parsed.data
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const where: Record<string, unknown> = { professionalId }
 
   if (status) where['status'] = status
@@ -169,7 +169,10 @@ export async function updateAppointmentStatus(req: Request, res: Response): Prom
     return
   }
   const { id } = req.params
-  const appointment = await prisma.appointment.findUnique({ where: { id }, include: { service: true } })
+  const appointment = await prisma.appointment.findFirst({
+    where: { id, professionalId: req.professionalId ?? '' },
+    include: { service: true },
+  })
   if (!appointment) {
     fail(res, 'Appointment not found', 404)
     return
@@ -203,7 +206,7 @@ export async function updateAppointmentPayment(req: Request, res: Response): Pro
     return
   }
   const { id } = req.params
-  const appointment = await prisma.appointment.findUnique({ where: { id } })
+  const appointment = await prisma.appointment.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!appointment) {
     fail(res, 'Appointment not found', 404)
     return
@@ -229,7 +232,7 @@ export async function updateAppointmentAttendance(req: Request, res: Response): 
     return
   }
   const { id } = req.params
-  const appointment = await prisma.appointment.findUnique({ where: { id } })
+  const appointment = await prisma.appointment.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!appointment) {
     fail(res, 'Appointment not found', 404)
     return
@@ -248,7 +251,7 @@ export async function updateAppointmentOutcome(req: Request, res: Response): Pro
     return
   }
   const { id } = req.params
-  const appointment = await prisma.appointment.findUnique({ where: { id } })
+  const appointment = await prisma.appointment.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!appointment) {
     fail(res, 'Appointment not found', 404)
     return
@@ -263,7 +266,7 @@ export async function updateAppointmentOutcome(req: Request, res: Response): Pro
 /** Reenvía el correo de confirmación de cita (incluye el botón "Confirmar asistencia"). */
 export async function notifyAppointmentConfirmation(req: Request, res: Response): Promise<void> {
   const { id } = req.params
-  const appointment = await prisma.appointment.findUnique({ where: { id } })
+  const appointment = await prisma.appointment.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!appointment) {
     fail(res, 'Appointment not found', 404)
     return

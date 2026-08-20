@@ -45,7 +45,7 @@ export async function updateTransferConfig(req: Request, res: Response): Promise
     return
   }
 
-  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professionalId = req.professionalId ?? ''
   const professional = await prisma.professional.findUnique({ where: { id: professionalId } })
   if (!professional) {
     fail(res, 'Professional not found', 404)
