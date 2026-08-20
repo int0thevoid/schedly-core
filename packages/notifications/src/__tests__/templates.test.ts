@@ -98,16 +98,47 @@ describe('appointmentReminderTemplate', () => {
     googleCalendarUrl: 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Primera+visita',
     startDateTime: new Date('2026-06-10T14:00:00.000Z'),
     endDateTime: new Date('2026-06-10T14:45:00.000Z'),
+    timing: 'same_day',
+    professionalPhone: '+56966898588',
+    paymentStatus: 'paid',
+    price: 30000,
+    transferData: {
+      rut: '12.345.678-5',
+      bank: 'Banco Estado',
+      accountType: 'Cuenta Vista / RUT',
+      accountNumber: '12345678',
+      email: 'pagos@test.com',
+    },
   }
 
-  it('subject is "Todo listo para tu sesión de hoy"', () => {
+  it('subject is "Todo listo para tu sesión de hoy" cuando timing es same_day', () => {
     const { subject } = appointmentReminderTemplate(baseData)
     expect(subject).toBe('🩵 Todo listo para tu sesión de hoy')
   })
 
-  it('tells the client their session is in 2 hours', () => {
+  it('tells the client their session is in 2 hours cuando timing es same_day', () => {
     const { html } = appointmentReminderTemplate(baseData)
     expect(html).toContain('2 horas')
+  })
+
+  it('subject y copy cambian a "mañana" cuando timing es day_before', () => {
+    const { subject, html } = appointmentReminderTemplate({ ...baseData, timing: 'day_before' })
+    expect(subject).toBe('🩵 Recordatorio: tu sesión es mañana')
+    expect(html).toContain('mañana')
+    expect(html).not.toContain('2 horas')
+  })
+
+  it('incluye la sección de pago pendiente + link de WhatsApp cuando paymentStatus es unpaid', () => {
+    const { html } = appointmentReminderTemplate({ ...baseData, paymentStatus: 'unpaid' })
+    expect(html).toContain('Pago pendiente')
+    expect(html).toContain('Enviar comprobante por WhatsApp')
+    expect(html).toContain('wa.me')
+  })
+
+  it('no incluye la sección de pago pendiente cuando paymentStatus es paid', () => {
+    const { html } = appointmentReminderTemplate({ ...baseData, paymentStatus: 'paid' })
+    expect(html).not.toContain('Pago pendiente')
+    expect(html).not.toContain('Enviar comprobante por WhatsApp')
   })
 
   it('includes the appointment date and times', () => {

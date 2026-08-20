@@ -1,7 +1,14 @@
 export { EmailService } from './email.service.js'
-export { getAppointmentsNeedingReminder, type AppointmentForReminder, type AppointmentsNeedingReminder } from './scheduler.js'
+export {
+  getAppointmentsNeedingReminder,
+  type AppointmentForReminder,
+  type AppointmentNeedingReminder,
+  type AppointmentsNeedingReminder,
+  type ReminderTiming,
+} from './scheduler.js'
 export * from './templates/appointment-confirmation.js'
 export * from './templates/appointment-reminder.js'
+export * from './templates/payment-reminder.js'
 export * from './templates/professional-new-booking.js'
 export * from './templates/appointment-modified.js'
 export * from './templates/appointment-cancelled-by-patient.js'

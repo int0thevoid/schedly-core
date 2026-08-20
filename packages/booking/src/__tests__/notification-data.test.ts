@@ -74,14 +74,26 @@ describe('buildAppointmentConfirmationData', () => {
 
 describe('buildAppointmentReminderData', () => {
   it('includes a Google Calendar URL', () => {
-    const data = buildAppointmentReminderData(APPOINTMENT, PROFESSIONAL)
+    const data = buildAppointmentReminderData(APPOINTMENT, PROFESSIONAL, 'same_day')
     expect(data.googleCalendarUrl).toContain('calendar.google.com')
   })
 
   it('includes start and end times', () => {
-    const data = buildAppointmentReminderData(APPOINTMENT, PROFESSIONAL)
+    const data = buildAppointmentReminderData(APPOINTMENT, PROFESSIONAL, 'same_day')
     expect(data.startTime).toBeDefined()
     expect(data.endTime).toBeDefined()
+  })
+
+  it('passes through the timing argument', () => {
+    const data = buildAppointmentReminderData(APPOINTMENT, PROFESSIONAL, 'day_before')
+    expect(data.timing).toBe('day_before')
+  })
+
+  it('marks paymentStatus as unpaid when the appointment is unpaid', () => {
+    const unpaid = { ...APPOINTMENT, paymentStatus: 'unpaid' } as unknown as AppointmentWithService
+    const data = buildAppointmentReminderData(unpaid, PROFESSIONAL, 'same_day')
+    expect(data.paymentStatus).toBe('unpaid')
+    expect(data.price).toBe(APPOINTMENT.service.price)
   })
 })
 

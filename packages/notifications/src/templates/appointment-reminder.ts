@@ -1,4 +1,5 @@
-import { COLORS, escapeHtml, googleMapsLink, renderLayout, type EmailTemplate } from './layout.js'
+import { COLORS, contactFooter, escapeHtml, googleMapsLink, renderLayout, type EmailTemplate } from './layout.js'
+import { renderPaymentDueSection, type TransferData } from './payment-reminder.js'
 
 export interface AppointmentReminderData {
   clientName: string
@@ -12,6 +13,14 @@ export interface AppointmentReminderData {
   googleCalendarUrl: string
   startDateTime: Date
   endDateTime: Date
+  /** Cuándo se dispara este recordatorio: el día anterior a las 10:00, o 2h antes cuando la
+   * cita se agendó para el mismo día (sin ventana de "día anterior" disponible). */
+  timing: 'day_before' | 'same_day'
+  professionalPhone: string
+  /** Si la cita sigue sin pago registrado, se agrega la sección de pago pendiente + WhatsApp. */
+  paymentStatus: 'paid' | 'unpaid'
+  price: number
+  transferData: TransferData
 }
 
 function renderLocation(data: AppointmentReminderData): string {
@@ -31,11 +40,24 @@ function renderLocation(data: AppointmentReminderData): string {
 }
 
 export function appointmentReminderTemplate(data: AppointmentReminderData): EmailTemplate {
-  const subject = '🩵 Todo listo para tu sesión de hoy'
+  const subject = data.timing === 'same_day' ? '🩵 Todo listo para tu sesión de hoy' : '🩵 Recordatorio: tu sesión es mañana'
+  const introText = data.timing === 'same_day' ? 'Tu sesión es en <strong>2 horas</strong>.' : 'Tu sesión es <strong>mañana</strong>.'
+
+  const paymentSection =
+    data.paymentStatus === 'unpaid'
+      ? renderPaymentDueSection({
+          serviceName: data.serviceName,
+          date: data.date,
+          time: data.startTime,
+          price: data.price,
+          transferData: data.transferData,
+          professionalPhone: data.professionalPhone,
+        })
+      : ''
 
   const bodyHtml = `
     <p style="margin:0 0 16px;font-size:16px;">¡Hola ${escapeHtml(data.clientName)}!</p>
-    <p style="margin:0 0 24px;font-size:16px;">Tu sesión es en <strong>2 horas</strong>. Aquí un recordatorio:</p>
+    <p style="margin:0 0 24px;font-size:16px;">${introText} Aquí un recordatorio:</p>
 
     <div style="background-color:${COLORS.primaryFaint};border-radius:8px;padding:20px;margin-bottom:24px;">
       <table role="presentation" style="width:100%;border-collapse:collapse;font-size:15px;">
@@ -50,13 +72,15 @@ export function appointmentReminderTemplate(data: AppointmentReminderData): Emai
 
     <p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Llega / conéctate unos minutos antes para comenzar puntual.</p>
 
-    <div style="text-align:center;">
+    <div style="text-align:center;margin-bottom:${data.paymentStatus === 'unpaid' ? '24px' : '0'};">
       <a href="${escapeHtml(data.googleCalendarUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.primary};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;border:1px solid ${COLORS.primary};">📅 Agregar a Google Calendar</a>
     </div>
+
+    ${paymentSection}
   `
 
   return {
     subject,
-    html: renderLayout({ bodyHtml }),
+    html: renderLayout({ bodyHtml, footerHtml: contactFooter(data.professionalPhone) }),
   }
 }

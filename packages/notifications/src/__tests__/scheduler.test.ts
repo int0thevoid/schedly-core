@@ -8,130 +8,79 @@ function makeAppointment(overrides: Partial<AppointmentForReminder>): Appointmen
     id: 'apt1',
     startDateTime: new Date('2026-06-16T09:00:00Z'),
     status: 'confirmed',
-    paymentStatus: 'paid',
     reminderSentAt: null,
-    reminder2hSentAt: null,
-    paymentReminderSentAt: null,
     ...overrides,
   }
 }
 
 describe('getAppointmentsNeedingReminder', () => {
-  const NOW = new Date('2026-06-15T08:00:00Z')
-
-  it('includes appointments that start tomorrow without a 24h reminder sent', () => {
-    const appointment = makeAppointment({ startDateTime: new Date('2026-06-16T09:00:00Z'), reminderSentAt: null })
-    const result = getAppointmentsNeedingReminder([appointment], NOW, TIMEZONE)
-    expect(result.reminder24h).toEqual([appointment])
-  })
-
-  it('excludes appointments that already had a 24h reminder sent', () => {
-    const appointment = makeAppointment({
-      startDateTime: new Date('2026-06-16T09:00:00Z'),
-      reminderSentAt: new Date('2026-06-15T08:00:00Z'),
-    })
-    const result = getAppointmentsNeedingReminder([appointment], NOW, TIMEZONE)
-    expect(result.reminder24h).toEqual([])
-  })
-
-  it('excludes appointments that start the day after tomorrow', () => {
-    const appointment = makeAppointment({ startDateTime: new Date('2026-06-17T09:00:00Z') })
-    const result = getAppointmentsNeedingReminder([appointment], NOW, TIMEZONE)
-    expect(result.reminder24h).toEqual([])
-  })
-
-  it('includes appointments starting within the next 2 hours without a 2h reminder sent', () => {
-    const appointment = makeAppointment({ startDateTime: new Date('2026-06-15T09:00:00Z'), reminder2hSentAt: null })
-    const result = getAppointmentsNeedingReminder([appointment], NOW, TIMEZONE)
-    expect(result.reminder2h).toEqual([appointment])
-  })
-
-  it('excludes appointments starting in more than 2 hours', () => {
-    const appointment = makeAppointment({ startDateTime: new Date('2026-06-15T11:00:00Z'), reminder2hSentAt: null })
-    const result = getAppointmentsNeedingReminder([appointment], NOW, TIMEZONE)
-    expect(result.reminder2h).toEqual([])
-  })
-
-  it('excludes appointments that already started', () => {
-    const appointment = makeAppointment({ startDateTime: new Date('2026-06-15T07:00:00Z'), reminder2hSentAt: null })
-    const result = getAppointmentsNeedingReminder([appointment], NOW, TIMEZONE)
-    expect(result.reminder2h).toEqual([])
-  })
-
-  it('excludes appointments that already had a 2h reminder sent', () => {
-    const appointment = makeAppointment({
-      startDateTime: new Date('2026-06-15T09:00:00Z'),
-      reminder2hSentAt: new Date('2026-06-15T07:00:00Z'),
-    })
-    const result = getAppointmentsNeedingReminder([appointment], NOW, TIMEZONE)
-    expect(result.reminder2h).toEqual([])
-  })
-
-  it('includes unpaid appointments for tomorrow once it is past 10:00 today', () => {
+  it('day_before: incluye una cita de mañana una vez pasadas las 10:00 de hoy', () => {
     const now = new Date('2026-06-15T10:30:00Z')
-    const appointment = makeAppointment({
-      startDateTime: new Date('2026-06-16T09:00:00Z'),
-      paymentStatus: 'unpaid',
-      paymentReminderSentAt: null,
-    })
+    const appointment = makeAppointment({ startDateTime: new Date('2026-06-16T09:00:00Z') })
     const result = getAppointmentsNeedingReminder([appointment], now, TIMEZONE)
-    expect(result.paymentReminder).toEqual([appointment])
+    expect(result.reminder).toEqual([{ appointment, timing: 'day_before' }])
   })
 
-  it('excludes unpaid appointments for tomorrow before 10:00 today', () => {
+  it('day_before: excluye una cita de mañana antes de las 10:00 de hoy', () => {
     const now = new Date('2026-06-15T08:00:00Z')
-    const appointment = makeAppointment({
-      startDateTime: new Date('2026-06-16T09:00:00Z'),
-      paymentStatus: 'unpaid',
-      paymentReminderSentAt: null,
-    })
+    const appointment = makeAppointment({ startDateTime: new Date('2026-06-16T09:00:00Z') })
     const result = getAppointmentsNeedingReminder([appointment], now, TIMEZONE)
-    expect(result.paymentReminder).toEqual([])
+    expect(result.reminder).toEqual([])
   })
 
-  it('includes unpaid appointments for today once it is past 20:00', () => {
+  it('excluye citas que empiezan pasado mañana (fuera de ambas ventanas)', () => {
+    const now = new Date('2026-06-15T10:30:00Z')
+    const appointment = makeAppointment({ startDateTime: new Date('2026-06-17T09:00:00Z') })
+    const result = getAppointmentsNeedingReminder([appointment], now, TIMEZONE)
+    expect(result.reminder).toEqual([])
+  })
+
+  it('same_day: incluye una cita de hoy dentro de las 2 horas previas al inicio', () => {
+    const now = new Date('2026-06-15T20:30:00Z')
+    const appointment = makeAppointment({ startDateTime: new Date('2026-06-15T22:00:00Z') })
+    const result = getAppointmentsNeedingReminder([appointment], now, TIMEZONE)
+    expect(result.reminder).toEqual([{ appointment, timing: 'same_day' }])
+  })
+
+  it('same_day: excluye una cita de hoy con más de 2 horas de margen (agendada el mismo día, con tiempo de sobra)', () => {
+    const now = new Date('2026-06-15T08:00:00Z')
+    const appointment = makeAppointment({ startDateTime: new Date('2026-06-15T22:00:00Z') })
+    const result = getAppointmentsNeedingReminder([appointment], now, TIMEZONE)
+    expect(result.reminder).toEqual([])
+  })
+
+  it('excluye citas que ya empezaron', () => {
+    const now = new Date('2026-06-15T08:00:00Z')
+    const appointment = makeAppointment({ startDateTime: new Date('2026-06-15T07:00:00Z') })
+    const result = getAppointmentsNeedingReminder([appointment], now, TIMEZONE)
+    expect(result.reminder).toEqual([])
+  })
+
+  it('excluye citas con el recordatorio ya enviado, sin importar la ventana', () => {
     const now = new Date('2026-06-15T20:30:00Z')
     const appointment = makeAppointment({
       startDateTime: new Date('2026-06-15T22:00:00Z'),
-      paymentStatus: 'unpaid',
-      paymentReminderSentAt: null,
+      reminderSentAt: new Date('2026-06-15T20:15:00Z'),
     })
     const result = getAppointmentsNeedingReminder([appointment], now, TIMEZONE)
-    expect(result.paymentReminder).toEqual([appointment])
+    expect(result.reminder).toEqual([])
   })
 
-  it('does not send a payment reminder twice on the same day', () => {
+  it('excluye citas canceladas', () => {
     const now = new Date('2026-06-15T20:30:00Z')
-    const appointment = makeAppointment({
-      startDateTime: new Date('2026-06-15T22:00:00Z'),
-      paymentStatus: 'unpaid',
-      paymentReminderSentAt: new Date('2026-06-15T10:30:00Z'),
-    })
+    const appointment = makeAppointment({ startDateTime: new Date('2026-06-16T09:00:00Z'), status: 'cancelled' })
     const result = getAppointmentsNeedingReminder([appointment], now, TIMEZONE)
-    expect(result.paymentReminder).toEqual([])
+    expect(result.reminder).toEqual([])
   })
 
-  it('excludes paid appointments from payment reminders', () => {
-    const now = new Date('2026-06-15T20:30:00Z')
-    const appointment = makeAppointment({
-      startDateTime: new Date('2026-06-15T22:00:00Z'),
-      paymentStatus: 'paid',
-      paymentReminderSentAt: null,
-    })
+  it('prioriza day_before sobre same_day si ambas ventanas coincidieran (caso límite, no debería pasar en la práctica)', () => {
+    // Cita de "mañana" según la ventana day_before, pero también dentro de las 2h — con las reglas de
+    // calendario actuales esto es imposible en la práctica (isNextLocalDay e isSameLocalDay son
+    // mutuamente excluyentes), pero fijamos el comportamiento explícito por si el cálculo de zona
+    // horaria cambia en el futuro: day_before gana.
+    const now = new Date('2026-06-15T10:30:00Z')
+    const appointment = makeAppointment({ startDateTime: new Date('2026-06-16T09:00:00Z') })
     const result = getAppointmentsNeedingReminder([appointment], now, TIMEZONE)
-    expect(result.paymentReminder).toEqual([])
-  })
-
-  it('excludes cancelled appointments from every reminder type', () => {
-    const now = new Date('2026-06-15T20:30:00Z')
-    const appointment = makeAppointment({
-      startDateTime: new Date('2026-06-16T09:00:00Z'),
-      status: 'cancelled',
-      paymentStatus: 'unpaid',
-    })
-    const result = getAppointmentsNeedingReminder([appointment], now, TIMEZONE)
-    expect(result.reminder24h).toEqual([])
-    expect(result.reminder2h).toEqual([])
-    expect(result.paymentReminder).toEqual([])
+    expect(result.reminder[0]?.timing).toBe('day_before')
   })
 })
