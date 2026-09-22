@@ -85,6 +85,22 @@ describe('appointmentConfirmationTemplate', () => {
     const { html } = appointmentConfirmationTemplate({ ...baseData, modality: 'online', address: undefined })
     expect(html).not.toContain('Buenos Aires 1088')
   })
+
+  it('shows the Meet link and a join button when modality is online and meetLink is set', () => {
+    const { html } = appointmentConfirmationTemplate({
+      ...baseData,
+      modality: 'online',
+      address: undefined,
+      meetLink: 'https://meet.google.com/abc-defg-hij',
+    })
+    expect(html).toContain('https://meet.google.com/abc-defg-hij')
+    expect(html).toContain('Unirse a la videollamada')
+  })
+
+  it('falls back to the placeholder text when online and no meetLink is set yet', () => {
+    const { html } = appointmentConfirmationTemplate({ ...baseData, modality: 'online', address: undefined })
+    expect(html).toContain('Recibirás el link de videollamada próximamente')
+  })
 })
 
 describe('appointmentReminderTemplate', () => {
@@ -279,6 +295,17 @@ describe('appointmentModifiedTemplate', () => {
   it('does not include address when absent (online)', () => {
     const { html } = appointmentModifiedTemplate({ ...baseData, modality: 'online', address: undefined })
     expect(html).not.toContain('Buenos Aires')
+  })
+
+  it('shows the Meet link when modality is online and meetLink is set', () => {
+    const { html } = appointmentModifiedTemplate({
+      ...baseData,
+      modality: 'online',
+      address: undefined,
+      meetLink: 'https://meet.google.com/abc-defg-hij',
+    })
+    expect(html).toContain('https://meet.google.com/abc-defg-hij')
+    expect(html).toContain('Unirse a la videollamada')
   })
 })
 

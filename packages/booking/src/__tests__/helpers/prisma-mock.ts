@@ -41,6 +41,11 @@ export const prismaMock = {
     update: vi.fn(),
     upsert: vi.fn(),
   },
+  consentDocument: {
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    upsert: vi.fn(),
+  },
   $transaction: vi.fn(),
 }
 

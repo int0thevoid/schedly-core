@@ -18,3 +18,9 @@ export * from './templates/confirm-attendance-page.js'
 export * from './templates/daily-digest.js'
 export { generateGoogleCalendarUrl } from './utils/google-calendar.js'
 export { generateICSFile, type ICSParams } from './utils/ics-generator.js'
+export {
+  createGoogleMeetEvent,
+  cancelGoogleMeetEvent,
+  type GoogleMeetEventInput,
+  type GoogleMeetEventResult,
+} from './utils/google-meet.js'

@@ -13,6 +13,7 @@ import {
   type AppointmentWithService,
 } from '../lib/notification-data.js'
 import { getEmailService } from '../lib/email-service.js'
+import { ensureGoogleMeetEvent, cancelGoogleMeetEventForAppointment } from '../lib/google-meet.js'
 import { Prisma, type Appointment, type Service } from '../generated/prisma/index.js'
 
 // P2034 = "Transaction failed due to a write conflict or a deadlock. Please retry
@@ -178,7 +179,8 @@ async function sendNewAppointmentEmails(appointment: Appointment, service: Servi
   try {
     const professional = await prisma.professional.findUnique({ where: { id: appointment.professionalId } })
     if (!professional) return
-    const appointmentWithService = { ...appointment, service }
+    const appointmentWithMeet = await ensureGoogleMeetEvent(appointment, service, professional.name)
+    const appointmentWithService = { ...appointmentWithMeet, service }
     const emailService = getEmailService()
     await Promise.allSettled([
       emailService.sendAppointmentConfirmation(
@@ -257,6 +259,7 @@ export async function cancelByToken(req: Request, res: Response): Promise<void> 
     data: { status: 'cancelled' },
   })
 
+  void cancelGoogleMeetEventForAppointment(appointment)
   void sendCancellationEmails(appointment)
 
   ok(res, { success: true })
@@ -371,11 +374,17 @@ async function sendRescheduleEmail(
   newAppointment: Appointment & { service: Service },
 ): Promise<void> {
   try {
+    void cancelGoogleMeetEventForAppointment(originalAppointment)
+
     const professional = await prisma.professional.findUnique({ where: { id: newAppointment.professionalId } })
     if (!professional) return
+
+    const newAppointmentWithMeet = await ensureGoogleMeetEvent(newAppointment, newAppointment.service, professional.name)
+    const newAppointmentForEmail = { ...newAppointmentWithMeet, service: newAppointment.service }
+
     await getEmailService().sendAppointmentModified(
-      newAppointment.clientEmail,
-      buildAppointmentModifiedData(originalAppointment, newAppointment, professional),
+      newAppointmentForEmail.clientEmail,
+      buildAppointmentModifiedData(originalAppointment, newAppointmentForEmail, professional),
     )
   } catch (err) {
     console.error(`[notifications] failed to send reschedule email for appointment ${newAppointment.id}`, err)
@@ -434,5 +443,7 @@ export async function cancelAppointment(req: Request, res: Response): Promise<vo
     data: { status: 'cancelled' },
   })
   ok(res, updated)
+
+  void cancelGoogleMeetEventForAppointment(appointment)
 }
 

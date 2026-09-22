@@ -70,6 +70,24 @@ describe('buildAppointmentConfirmationData', () => {
     const data = buildAppointmentConfirmationData(online, PROFESSIONAL)
     expect(data.address).toBeUndefined()
   })
+
+  it('sets meetLink for online modality when the appointment has one', () => {
+    const online = { ...APPOINTMENT, modality: 'online', meetLink: 'https://meet.google.com/abc-defg-hij' } as unknown as AppointmentWithService
+    const data = buildAppointmentConfirmationData(online, PROFESSIONAL)
+    expect(data.meetLink).toBe('https://meet.google.com/abc-defg-hij')
+  })
+
+  it('sets no meetLink for presential modality even if the field is populated', () => {
+    const presential = { ...APPOINTMENT, modality: 'presential', meetLink: 'https://meet.google.com/abc-defg-hij' } as unknown as AppointmentWithService
+    const data = buildAppointmentConfirmationData(presential, PROFESSIONAL)
+    expect(data.meetLink).toBeUndefined()
+  })
+
+  it('uses the Meet link as the Google Calendar event location for online appointments', () => {
+    const online = { ...APPOINTMENT, modality: 'online', meetLink: 'https://meet.google.com/abc-defg-hij' } as unknown as AppointmentWithService
+    const data = buildAppointmentConfirmationData(online, PROFESSIONAL)
+    expect(data.googleCalendarUrl).toContain(encodeURIComponent('https://meet.google.com/abc-defg-hij'))
+  })
 })
 
 describe('buildAppointmentReminderData', () => {
