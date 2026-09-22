@@ -65,7 +65,7 @@ function buildBookingUrl(): string {
 
 function buildGoogleCalendarUrl(appointment: AppointmentWithService, professional: Professional): string {
   const modality = toModality(appointment.modality)
-  const location = modality === 'presential' ? (process.env.PROFESSIONAL_ADDRESS ?? undefined) : undefined
+  const location = modality === 'presential' ? (process.env.PROFESSIONAL_ADDRESS ?? undefined) : (appointment.meetLink ?? undefined)
   return generateGoogleCalendarUrl({
     title: `${appointment.service.name} — ${professional.name}`,
     startDateTime: appointment.startDateTime,
@@ -104,6 +104,7 @@ export function buildAppointmentConfirmationData(
     endTime: formatAppointmentTime(appointment.endDateTime, professional.timezone),
     modality,
     address: modality === 'presential' ? process.env.PROFESSIONAL_ADDRESS : undefined,
+    meetLink: modality === 'online' ? appointment.meetLink ?? undefined : undefined,
     price: appointment.service.price,
     professionalName: professional.name,
     professionalPhone: professional.phone ?? '',
@@ -129,6 +130,7 @@ export function buildAppointmentReminderData(
     endTime: formatAppointmentTime(appointment.endDateTime, professional.timezone),
     modality,
     address: modality === 'presential' ? process.env.PROFESSIONAL_ADDRESS : undefined,
+    meetLink: modality === 'online' ? appointment.meetLink ?? undefined : undefined,
     googleCalendarUrl: buildGoogleCalendarUrl(appointment, professional),
     startDateTime: appointment.startDateTime,
     endDateTime: appointment.endDateTime,
@@ -176,6 +178,7 @@ export function buildAppointmentModifiedData(
     newEndTime: formatAppointmentTime(newAppointment.endDateTime, professional.timezone),
     modality,
     address: modality === 'presential' ? process.env.PROFESSIONAL_ADDRESS : undefined,
+    meetLink: modality === 'online' ? newAppointment.meetLink ?? undefined : undefined,
     price: newAppointment.service.price,
     professionalName: professional.name,
     professionalPhone: professional.phone ?? '',

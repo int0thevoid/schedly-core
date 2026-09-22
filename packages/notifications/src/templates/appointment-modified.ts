@@ -10,6 +10,7 @@ export interface AppointmentModifiedData {
   newEndTime: string
   modality: 'presential' | 'online'
   address?: string
+  meetLink?: string
   price: number
   professionalName: string
   professionalPhone: string
@@ -26,6 +27,13 @@ function renderLocation(data: AppointmentModifiedData): string {
       <p style="margin:0 0 4px;font-size:15px;">📍 <strong>Ubicación:</strong> ${escapeHtml(data.address)}</p>
       <p style="margin:0 0 24px;font-size:14px;">
         <a href="${googleMapsLink(data.address)}" style="color:${COLORS.primary};text-decoration:underline;">Ver en Google Maps</a>
+      </p>`
+  }
+  if (data.meetLink) {
+    return `
+      <p style="margin:0 0 4px;font-size:15px;">💻 <strong>Sesión online por Google Meet</strong></p>
+      <p style="margin:0 0 24px;font-size:14px;">
+        <a href="${escapeHtml(data.meetLink)}" style="color:${COLORS.primary};text-decoration:underline;">Unirse a la videollamada</a>
       </p>`
   }
   return `<p style="margin:0 0 24px;font-size:15px;">💻 Sesión online. Recibirás el link de videollamada próximamente.</p>`

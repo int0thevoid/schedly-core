@@ -26,7 +26,7 @@ export class EmailService {
       title: data.serviceName,
       startDateTime: data.startDateTime,
       endDateTime: data.endDateTime,
-      location: data.modality === 'presential' ? data.address : undefined,
+      location: data.modality === 'presential' ? data.address : data.meetLink,
       description: `Cita con ${data.professionalName}. ${data.modality === 'presential' ? data.address ?? '' : 'Modalidad online'}`.trim(),
     })
     await this.send(to, subject, html, [{ filename: 'cita.ics', content: ics }])
@@ -38,7 +38,7 @@ export class EmailService {
       title: data.serviceName,
       startDateTime: data.startDateTime,
       endDateTime: data.endDateTime,
-      location: data.modality === 'presential' ? data.address : undefined,
+      location: data.modality === 'presential' ? data.address : data.meetLink,
       description: `Recordatorio: ${data.serviceName}. ${data.modality === 'presential' ? data.address ?? '' : 'Modalidad online'}`.trim(),
     })
     await this.send(to, subject, html, [{ filename: 'cita.ics', content: ics }])
@@ -55,7 +55,7 @@ export class EmailService {
       title: data.newServiceName,
       startDateTime: data.newStartDateTime,
       endDateTime: data.newEndDateTime,
-      location: data.modality === 'presential' ? data.address : undefined,
+      location: data.modality === 'presential' ? data.address : data.meetLink,
       description: `Cita reagendada con ${data.professionalName}. ${data.modality === 'presential' ? data.address ?? '' : 'Modalidad online'}`.trim(),
     })
     await this.send(to, subject, html, [{ filename: 'cita.ics', content: ics }])

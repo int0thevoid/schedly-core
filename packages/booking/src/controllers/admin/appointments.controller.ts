@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
 import { getEmailService } from '../../lib/email-service.js'
+import { cancelGoogleMeetEventForAppointment } from '../../lib/google-meet.js'
 import {
   buildAppointmentCancelledByPatientData,
   buildAppointmentConfirmationData,
@@ -184,6 +185,7 @@ export async function updateAppointmentStatus(req: Request, res: Response): Prom
   ok(res, updated)
 
   if (parsed.data.status === 'cancelled') {
+    void cancelGoogleMeetEventForAppointment(appointment)
     void sendCancellationEmail(appointment as AppointmentWithService)
   }
 }
