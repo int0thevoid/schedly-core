@@ -56,20 +56,21 @@ describe('GET /api/admin/consent-document', () => {
   })
 
   it('returns the existing document', async () => {
-    prismaMock.consentDocument.findUnique.mockResolvedValue(DOCUMENT)
+    prismaMock.consentDocument.upsert.mockResolvedValue(DOCUMENT)
     const res = await request(app).get('/api/admin/consent-document').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
     expect(res.body.data.title).toBe(DOCUMENT.title)
-    expect(prismaMock.consentDocument.findUnique).toHaveBeenCalledWith({ where: { professionalId: 'pro1' } })
+    expect(prismaMock.consentDocument.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { professionalId: 'pro1' }, update: {} }),
+    )
   })
 
-  it('creates a default document lazily when none exists yet', async () => {
-    prismaMock.consentDocument.findUnique.mockResolvedValue(null)
-    prismaMock.consentDocument.create.mockResolvedValue(DOCUMENT)
+  it('creates a default document lazily when none exists yet (atomically, via upsert)', async () => {
+    prismaMock.consentDocument.upsert.mockResolvedValue(DOCUMENT)
     const res = await request(app).get('/api/admin/consent-document').set('Cookie', `auth_token=${token()}`)
     expect(res.status).toBe(200)
-    expect(prismaMock.consentDocument.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ professionalId: 'pro1' }) }),
+    expect(prismaMock.consentDocument.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ professionalId: 'pro1' }) }),
     )
   })
 })

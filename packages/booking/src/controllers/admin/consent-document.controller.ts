@@ -40,11 +40,14 @@ function serialize(doc: ConsentDocument) {
   }
 }
 
+// upsert (no findUnique + create) para que sea atómico: dos requests concurrentes
+// (dos pestañas, doble carga de la pantalla) no deben chocar contra la unique constraint
+// de professionalId — reproducido en producción como P2002.
 async function getOrCreateDocument(professionalId: string): Promise<ConsentDocument> {
-  const existing = await prisma.consentDocument.findUnique({ where: { professionalId } })
-  if (existing) return existing
-  return prisma.consentDocument.create({
-    data: { professionalId, title: DEFAULT_TITLE, content: DEFAULT_CONTENT },
+  return prisma.consentDocument.upsert({
+    where: { professionalId },
+    create: { professionalId, title: DEFAULT_TITLE, content: DEFAULT_CONTENT },
+    update: {},
   })
 }
 
