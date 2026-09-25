@@ -128,6 +128,17 @@ describe('buildNewBookingForProfessionalData', () => {
     expect(data.serviceName).toBe('Primera visita')
     expect(data.price).toBe(30000)
   })
+
+  it('includes meetLink for online appointments', () => {
+    const online = { ...APPOINTMENT, modality: 'online', meetLink: 'https://meet.google.com/abc-defg-hij' } as unknown as AppointmentWithService
+    const data = buildNewBookingForProfessionalData(online, PROFESSIONAL)
+    expect(data.meetLink).toBe('https://meet.google.com/abc-defg-hij')
+  })
+
+  it('has no meetLink for presential appointments', () => {
+    const data = buildNewBookingForProfessionalData(APPOINTMENT, PROFESSIONAL)
+    expect(data.meetLink).toBeUndefined()
+  })
 })
 
 describe('buildAppointmentCancelledByPatientData', () => {

@@ -20,7 +20,6 @@ export async function ensureGoogleMeetEvent(
       description: `Sesión de psicología con ${professionalName}`,
       startDateTime: appointment.startDateTime,
       endDateTime: appointment.endDateTime,
-      attendeeEmail: appointment.clientEmail,
     })
     if (!result) return appointment
 

@@ -156,6 +156,7 @@ export function buildNewBookingForProfessionalData(
     startTime: formatAppointmentTime(appointment.startDateTime, professional.timezone),
     endTime: formatAppointmentTime(appointment.endDateTime, professional.timezone),
     modality: modality === 'presential' ? 'Presencial' : 'Online',
+    meetLink: modality === 'online' ? appointment.meetLink ?? undefined : undefined,
     price: appointment.service.price,
     adminUrl: buildAdminAgendaUrl(),
   }

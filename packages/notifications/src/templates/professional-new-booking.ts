@@ -9,6 +9,7 @@ export interface ProfessionalNewBookingData {
   startTime: string
   endTime: string
   modality: string
+  meetLink?: string
   price: number
   adminUrl: string
 }
@@ -36,6 +37,7 @@ export function professionalNewBookingTemplate(data: ProfessionalNewBookingData)
         <tr><td style="padding:4px 0;color:${COLORS.muted};">Horario</td><td style="padding:4px 0;font-weight:600;">${escapeHtml(data.startTime)} – ${escapeHtml(data.endTime)}</td></tr>
         <tr><td style="padding:4px 0;color:${COLORS.muted};">Modalidad</td><td style="padding:4px 0;">${escapeHtml(data.modality)}</td></tr>
         <tr><td style="padding:4px 0;color:${COLORS.muted};">Valor</td><td style="padding:4px 0;font-weight:600;">${formatCLP(data.price)}</td></tr>
+        ${data.meetLink ? `<tr><td style="padding:4px 0;color:${COLORS.muted};">Meet</td><td style="padding:4px 0;"><a href="${escapeHtml(data.meetLink)}" style="color:${COLORS.primary};text-decoration:underline;">Unirse a la videollamada</a></td></tr>` : ''}
       </table>
     </div>
 

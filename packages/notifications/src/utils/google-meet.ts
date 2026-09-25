@@ -5,7 +5,6 @@ export interface GoogleMeetEventInput {
   description: string
   startDateTime: Date
   endDateTime: Date
-  attendeeEmail?: string
 }
 
 export interface GoogleMeetEventResult {
@@ -106,11 +105,14 @@ export async function createGoogleMeetEvent(input: GoogleMeetEventInput): Promis
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          // Sin `attendees`: una cuenta de servicio sin Domain-Wide Delegation (no disponible
+          // en una cuenta Gmail normal, solo en Google Workspace) no puede invitar asistentes —
+          // Google responde 403 y la creación del evento completo falla. El link de Meet se
+          // entrega igual a ambas partes por nuestros propios correos de confirmación.
           summary: input.title,
           description: input.description,
           start: { dateTime: input.startDateTime.toISOString() },
           end: { dateTime: input.endDateTime.toISOString() },
-          ...(input.attendeeEmail ? { attendees: [{ email: input.attendeeEmail }] } : {}),
           conferenceData: {
             createRequest: {
               requestId: randomUUID(),

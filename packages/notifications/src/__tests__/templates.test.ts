@@ -229,6 +229,21 @@ describe('professionalNewBookingTemplate', () => {
     expect(html).toContain('Ver en el panel')
   })
 
+  it('shows the Meet link when the appointment is online and has one', () => {
+    const { html } = professionalNewBookingTemplate({
+      ...baseData,
+      modality: 'Online',
+      meetLink: 'https://meet.google.com/abc-defg-hij',
+    })
+    expect(html).toContain('https://meet.google.com/abc-defg-hij')
+    expect(html).toContain('Unirse a la videollamada')
+  })
+
+  it('omits the Meet row when there is no meetLink', () => {
+    const { html } = professionalNewBookingTemplate(baseData)
+    expect(html).not.toContain('Unirse a la videollamada')
+  })
+
   it('escapes HTML in client-provided fields', () => {
     const { html } = professionalNewBookingTemplate({ ...baseData, clientName: '<script>xss</script>' })
     expect(html).not.toContain('<script>xss</script>')
