@@ -30,22 +30,35 @@ function renderLocation(data: AppointmentConfirmationData): string {
   if (data.meetLink) {
     return `
       <p style="margin:0 0 4px;font-size:15px;">💻 <strong>Sesión online por Google Meet</strong></p>
-      <p style="margin:0 0 24px;font-size:14px;">
+      <p style="margin:0 0 4px;font-size:14px;">
         <a href="${escapeHtml(data.meetLink)}" style="color:${COLORS.primary};text-decoration:underline;">Unirse a la videollamada</a>
-      </p>`
+      </p>
+      <p style="margin:0 0 24px;font-size:13px;color:${COLORS.muted};">Ya se agregó automáticamente a tu Google Calendar — deberías haber recibido una invitación de Google por separado.</p>`
   }
   return `<p style="margin:0 0 24px;font-size:15px;">💻 Sesión online. Recibirás el link de videollamada próximamente.</p>`
 }
 
+/** El botón "Agregar a Google Calendar" (y el .ics adjunto — ver email.service.ts) solo tienen
+ * sentido cuando NO existe ya un evento real: para una cita online con Meet, el evento se crea
+ * directo en el calendario de ambos vía la API y el paciente ya queda invitado — agregar otro
+ * manualmente crea una segunda entrada sin conferencia real ("el ID de esta reunión corresponde
+ * a otro evento" al intentar unirse desde ahí). */
+function hasRealCalendarInvite(data: AppointmentConfirmationData): boolean {
+  return data.modality === 'online' && Boolean(data.meetLink)
+}
+
 function renderActionButtons(data: AppointmentConfirmationData): string {
+  const calendarButton = hasRealCalendarInvite(data)
+    ? ''
+    : `<div style="margin:12px 0 0;text-align:center;">
+      <a href="${escapeHtml(data.googleCalendarUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.primary};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;border:1px solid ${COLORS.primary};">📅 Agregar a Google Calendar</a>
+    </div>`
   return `
     <div style="margin:28px 0 0;text-align:center;">
       <a href="${escapeHtml(data.modifyUrl)}" style="display:inline-block;background-color:${COLORS.primary};color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;margin:4px;">✏️ Modificar cita</a>
       <a href="${escapeHtml(data.cancelUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.accent};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;margin:4px;border:1px solid ${COLORS.accent};">❌ Anular cita</a>
     </div>
-    <div style="margin:12px 0 0;text-align:center;">
-      <a href="${escapeHtml(data.googleCalendarUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.primary};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;border:1px solid ${COLORS.primary};">📅 Agregar a Google Calendar</a>
-    </div>`
+    ${calendarButton}`
 }
 
 export function appointmentConfirmationTemplate(data: AppointmentConfirmationData): EmailTemplate {
