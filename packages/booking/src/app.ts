@@ -18,6 +18,7 @@ import adminTransferRouter from './routes/admin/transfer.js'
 import adminProfessionalRouter from './routes/admin/professional.js'
 import adminClientsRouter from './routes/admin/clients.js'
 import adminConsentDocumentRouter from './routes/admin/consentDocument.js'
+import adminGoogleCalendarOauthRouter from './routes/admin/googleCalendarOauth.js'
 import clientsRouter from './routes/clients.js'
 import { getTransferConfig } from './controllers/admin/transfer.controller.js'
 import { getPublicConfig } from './controllers/admin/config.controller.js'
@@ -77,6 +78,7 @@ app.use('/api/admin/transfer-config', adminTransferRouter)
 app.use('/api/admin/professional', adminProfessionalRouter)
 app.use('/api/admin/clients', adminClientsRouter)
 app.use('/api/admin/consent-document', adminConsentDocumentRouter)
+app.use('/api/admin/google-calendar', adminGoogleCalendarOauthRouter)
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err)
