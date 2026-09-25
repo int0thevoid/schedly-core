@@ -1,10 +1,11 @@
-import { createSign, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 
 export interface GoogleMeetEventInput {
   title: string
   description: string
   startDateTime: Date
   endDateTime: Date
+  attendeeEmail?: string
 }
 
 export interface GoogleMeetEventResult {
@@ -12,55 +13,44 @@ export interface GoogleMeetEventResult {
   meetLink: string
 }
 
-interface GoogleCalendarCredentials {
-  clientEmail: string
-  privateKey: string
+interface GoogleOAuthCredentials {
+  clientId: string
+  clientSecret: string
+  refreshToken: string
   calendarId: string
 }
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
-const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar'
 
-function base64url(input: Buffer | string): string {
-  return Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function getCredentialsFromEnv(): GoogleCalendarCredentials | null {
-  const clientEmail = process.env.GOOGLE_CALENDAR_CLIENT_EMAIL
-  const rawPrivateKey = process.env.GOOGLE_CALENDAR_PRIVATE_KEY
+function getCredentialsFromEnv(): GoogleOAuthCredentials | null {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN
   const calendarId = process.env.GOOGLE_CALENDAR_ID
-  if (!clientEmail || !rawPrivateKey || !calendarId) return null
-  // En variables de entorno los saltos de línea de la private key suelen venir escapados (\n literal).
-  const privateKey = rawPrivateKey.includes('\\n') ? rawPrivateKey.replace(/\\n/g, '\n') : rawPrivateKey
-  return { clientEmail, privateKey, calendarId }
+  if (!clientId || !clientSecret || !refreshToken || !calendarId) return null
+  return { clientId, clientSecret, refreshToken, calendarId }
 }
 
-/** Firma un JWT de cuenta de servicio (RS256) y lo intercambia por un access token OAuth2. */
-async function getAccessToken(creds: GoogleCalendarCredentials): Promise<string> {
-  const nowSeconds = Math.floor(Date.now() / 1000)
-  const header = { alg: 'RS256', typ: 'JWT' }
-  const claims = {
-    iss: creds.clientEmail,
-    scope: CALENDAR_SCOPE,
-    aud: TOKEN_URL,
-    iat: nowSeconds,
-    exp: nowSeconds + 3600,
-  }
-  const signingInput = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(claims))}`
-  const signature = createSign('RSA-SHA256').update(signingInput).sign(creds.privateKey)
-  const assertion = `${signingInput}.${base64url(signature)}`
-
+/**
+ * Cambia el refresh token (obtenido una sola vez vía el flujo de consentimiento — ver
+ * `google-calendar-oauth.controller.ts` en @schedly/booking) por un access token OAuth2.
+ * A diferencia de una cuenta de servicio, esto actúa como la cuenta Google real del
+ * profesional — por eso sí puede crear conferencias de Meet e invitar asistentes.
+ */
+async function getAccessToken(creds: GoogleOAuthCredentials): Promise<string> {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion,
+      grant_type: 'refresh_token',
+      refresh_token: creds.refreshToken,
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
     }),
   })
 
   if (!res.ok) {
-    throw new Error(`Failed to obtain Google OAuth token: ${res.status} ${await res.text()}`)
+    throw new Error(`Failed to refresh Google OAuth token: ${res.status} ${await res.text()}`)
   }
   const json = (await res.json()) as { access_token?: string }
   if (!json.access_token) {
@@ -90,7 +80,7 @@ function extractMeetLink(event: GoogleCalendarEventResponse): string | undefined
 export async function createGoogleMeetEvent(input: GoogleMeetEventInput): Promise<GoogleMeetEventResult | null> {
   const creds = getCredentialsFromEnv()
   if (!creds) {
-    console.warn('[google-meet] Google Calendar credentials not configured — skipping Meet event creation')
+    console.warn('[google-meet] Google OAuth credentials not configured — skipping Meet event creation')
     return null
   }
 
@@ -105,14 +95,11 @@ export async function createGoogleMeetEvent(input: GoogleMeetEventInput): Promis
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Sin `attendees`: una cuenta de servicio sin Domain-Wide Delegation (no disponible
-          // en una cuenta Gmail normal, solo en Google Workspace) no puede invitar asistentes —
-          // Google responde 403 y la creación del evento completo falla. El link de Meet se
-          // entrega igual a ambas partes por nuestros propios correos de confirmación.
           summary: input.title,
           description: input.description,
           start: { dateTime: input.startDateTime.toISOString() },
           end: { dateTime: input.endDateTime.toISOString() },
+          ...(input.attendeeEmail ? { attendees: [{ email: input.attendeeEmail }] } : {}),
           conferenceData: {
             createRequest: {
               requestId: randomUUID(),
