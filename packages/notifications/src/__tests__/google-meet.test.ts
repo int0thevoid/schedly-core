@@ -82,17 +82,17 @@ describe('createGoogleMeetEvent', () => {
       description: 'Sesión online',
       startDateTime: START,
       endDateTime: END,
-      attendeeEmail: 'paciente@example.com',
     })
 
     expect(result).toEqual({ eventId: 'evt_1', meetLink: 'https://meet.google.com/abc-defg-hij' })
     expect(fetchMock).toHaveBeenCalledTimes(2)
     const [eventsUrl, eventsInit] = fetchMock.mock.calls[1] as [string, RequestInit]
     expect(eventsUrl).toContain('conferenceDataVersion=1')
-    expect(JSON.parse(eventsInit.body as string)).toMatchObject({
-      summary: 'Psicoterapia',
-      attendees: [{ email: 'paciente@example.com' }],
-    })
+    const body = JSON.parse(eventsInit.body as string)
+    expect(body).toMatchObject({ summary: 'Psicoterapia' })
+    // Una cuenta de servicio sin Domain-Wide Delegation no puede invitar asistentes —
+    // el request nunca debe incluir `attendees` (ver comentario en google-meet.ts).
+    expect(body.attendees).toBeUndefined()
   })
 
   it('returns null and does not throw when the token request fails', async () => {

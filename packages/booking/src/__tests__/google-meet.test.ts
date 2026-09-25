@@ -53,7 +53,7 @@ describe('ensureGoogleMeetEvent', () => {
     const result = await ensureGoogleMeetEvent(ONLINE_APPOINTMENT, SERVICE, 'Stefany Osorio')
 
     expect(createGoogleMeetEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Terapia individual — Stefany Osorio', attendeeEmail: 'ana@test.com' }),
+      expect.objectContaining({ title: 'Terapia individual — Stefany Osorio' }),
     )
     expect(prismaMock.appointment.update).toHaveBeenCalledWith({
       where: { id: 'apt1' },
