@@ -192,4 +192,47 @@ describe('EmailService — adjunto ICS', () => {
     const icsContent = (call.attachments[0].content as Buffer).toString()
     expect(icsContent).toContain('DTSTART:20260715T100000Z')
   })
+
+  it('no adjunta .ics cuando ya existe un evento real de Meet (online + meetLink)', async () => {
+    sendMock.mockResolvedValue({ data: { id: 'email-6' }, error: null })
+
+    const emailService = new EmailService()
+    await emailService.sendAppointmentConfirmation('ana@test.com', {
+      ...CONFIRMATION_DATA,
+      modality: 'online',
+      address: undefined,
+      meetLink: 'https://meet.google.com/abc-defg-hij',
+    })
+
+    const call = sendMock.mock.calls[0][0]
+    expect(call.attachments).toBeUndefined()
+  })
+
+  it('sendAppointmentReminder tampoco adjunta .ics con evento real de Meet', async () => {
+    sendMock.mockResolvedValue({ data: { id: 'email-7' }, error: null })
+
+    const emailService = new EmailService()
+    await emailService.sendAppointmentReminder('ana@test.com', {
+      ...REMINDER_DATA,
+      meetLink: 'https://meet.google.com/abc-defg-hij',
+    })
+
+    const call = sendMock.mock.calls[0][0]
+    expect(call.attachments).toBeUndefined()
+  })
+
+  it('sendAppointmentModified tampoco adjunta .ics con evento real de Meet', async () => {
+    sendMock.mockResolvedValue({ data: { id: 'email-8' }, error: null })
+
+    const emailService = new EmailService()
+    await emailService.sendAppointmentModified('ana@test.com', {
+      ...MODIFIED_DATA,
+      modality: 'online',
+      address: undefined,
+      meetLink: 'https://meet.google.com/abc-defg-hij',
+    })
+
+    const call = sendMock.mock.calls[0][0]
+    expect(call.attachments).toBeUndefined()
+  })
 })

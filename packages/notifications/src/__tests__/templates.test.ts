@@ -101,6 +101,26 @@ describe('appointmentConfirmationTemplate', () => {
     const { html } = appointmentConfirmationTemplate({ ...baseData, modality: 'online', address: undefined })
     expect(html).toContain('Recibirás el link de videollamada próximamente')
   })
+
+  it('omits the "Agregar a Google Calendar" button when a real Meet event already exists', () => {
+    const { html } = appointmentConfirmationTemplate({
+      ...baseData,
+      modality: 'online',
+      address: undefined,
+      meetLink: 'https://meet.google.com/abc-defg-hij',
+    })
+    expect(html).not.toContain('Agregar a Google Calendar')
+  })
+
+  it('keeps the "Agregar a Google Calendar" button for presential appointments', () => {
+    const { html } = appointmentConfirmationTemplate(baseData)
+    expect(html).toContain('Agregar a Google Calendar')
+  })
+
+  it('keeps the "Agregar a Google Calendar" button when online but no meetLink yet (fallback)', () => {
+    const { html } = appointmentConfirmationTemplate({ ...baseData, modality: 'online', address: undefined })
+    expect(html).toContain('Agregar a Google Calendar')
+  })
 })
 
 describe('appointmentReminderTemplate', () => {
@@ -173,6 +193,11 @@ describe('appointmentReminderTemplate', () => {
   it('includes meet link for online when provided', () => {
     const { html } = appointmentReminderTemplate({ ...baseData, meetLink: 'https://meet.google.com/abc-xyz' })
     expect(html).toContain('https://meet.google.com/abc-xyz')
+  })
+
+  it('omits the "Agregar a Google Calendar" button when a real Meet event already exists', () => {
+    const { html } = appointmentReminderTemplate({ ...baseData, meetLink: 'https://meet.google.com/abc-xyz' })
+    expect(html).not.toContain('Agregar a Google Calendar')
   })
 
   it('does not include meet link when absent', () => {
@@ -321,6 +346,16 @@ describe('appointmentModifiedTemplate', () => {
     })
     expect(html).toContain('https://meet.google.com/abc-defg-hij')
     expect(html).toContain('Unirse a la videollamada')
+  })
+
+  it('omits the "Agregar a Google Calendar" button when a real Meet event already exists', () => {
+    const { html } = appointmentModifiedTemplate({
+      ...baseData,
+      modality: 'online',
+      address: undefined,
+      meetLink: 'https://meet.google.com/abc-defg-hij',
+    })
+    expect(html).not.toContain('Agregar a Google Calendar')
   })
 })
 

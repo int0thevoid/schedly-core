@@ -39,6 +39,11 @@ function renderLocation(data: AppointmentReminderData): string {
   return `<p style="margin:0 0 24px;font-size:15px;">💻 Sesión online.${meetLinkHtml}</p>`
 }
 
+/** Ver comentario equivalente en appointment-confirmation.ts. */
+function hasRealCalendarInvite(data: AppointmentReminderData): boolean {
+  return data.modality === 'online' && Boolean(data.meetLink)
+}
+
 export function appointmentReminderTemplate(data: AppointmentReminderData): EmailTemplate {
   const subject = data.timing === 'same_day' ? '🩵 Todo listo para tu sesión de hoy' : '🩵 Recordatorio: tu sesión es mañana'
   const introText = data.timing === 'same_day' ? 'Tu sesión es en <strong>2 horas</strong>.' : 'Tu sesión es <strong>mañana</strong>.'
@@ -72,9 +77,9 @@ export function appointmentReminderTemplate(data: AppointmentReminderData): Emai
 
     <p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Llega / conéctate unos minutos antes para comenzar puntual.</p>
 
-    <div style="text-align:center;margin-bottom:${data.paymentStatus === 'unpaid' ? '24px' : '0'};">
+    ${hasRealCalendarInvite(data) ? '' : `<div style="text-align:center;margin-bottom:${data.paymentStatus === 'unpaid' ? '24px' : '0'};">
       <a href="${escapeHtml(data.googleCalendarUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.primary};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;border:1px solid ${COLORS.primary};">📅 Agregar a Google Calendar</a>
-    </div>
+    </div>`}
 
     ${paymentSection}
   `

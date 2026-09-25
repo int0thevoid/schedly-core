@@ -22,6 +22,14 @@ export class EmailService {
 
   async sendAppointmentConfirmation(to: string, data: AppointmentConfirmationData): Promise<void> {
     const { subject, html } = appointmentConfirmationTemplate(data)
+    // Si ya existe un evento real (online + Meet creado vía la API), no adjuntamos .ics: agregarlo
+    // manualmente crea una segunda entrada de calendario sin conferencia real, y "Unirse" desde
+    // ahí falla con "el ID de esta reunión corresponde a otro evento".
+    const hasRealCalendarInvite = data.modality === 'online' && Boolean(data.meetLink)
+    if (hasRealCalendarInvite) {
+      await this.send(to, subject, html)
+      return
+    }
     const ics = generateICSFile({
       title: data.serviceName,
       startDateTime: data.startDateTime,
@@ -34,6 +42,11 @@ export class EmailService {
 
   async sendAppointmentReminder(to: string, data: AppointmentReminderData): Promise<void> {
     const { subject, html } = appointmentReminderTemplate(data)
+    const hasRealCalendarInvite = data.modality === 'online' && Boolean(data.meetLink)
+    if (hasRealCalendarInvite) {
+      await this.send(to, subject, html)
+      return
+    }
     const ics = generateICSFile({
       title: data.serviceName,
       startDateTime: data.startDateTime,
@@ -51,6 +64,11 @@ export class EmailService {
 
   async sendAppointmentModified(to: string, data: AppointmentModifiedData): Promise<void> {
     const { subject, html } = appointmentModifiedTemplate(data)
+    const hasRealCalendarInvite = data.modality === 'online' && Boolean(data.meetLink)
+    if (hasRealCalendarInvite) {
+      await this.send(to, subject, html)
+      return
+    }
     const ics = generateICSFile({
       title: data.newServiceName,
       startDateTime: data.newStartDateTime,
