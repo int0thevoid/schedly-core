@@ -34,11 +34,11 @@ model Professional {
 
   cashPaymentEnabled Boolean @default(true)
 
-  services        Service[]
-  weeklySchedules WeeklySchedule[]
-  scheduleBlocks  ScheduleBlock[]
-  appointments    Appointment[]
-  consentDocument ConsentDocument?
+  services         Service[]
+  weeklySchedules  WeeklySchedule[]
+  scheduleBlocks   ScheduleBlock[]
+  appointments     Appointment[]
+  consentDocuments ConsentDocument[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -140,9 +140,13 @@ model Appointment {
   updatedAt DateTime @updatedAt
 }
 
+// Documentos legales/editoriales del flujo de agendamiento, editables desde el panel admin.
+// `type` distingue entre los distintos documentos (hoy: almacenamiento de datos y cancelación) —
+// mismo shape y misma lógica de saneamiento para ambos, por eso comparten tabla en vez de duplicarla.
 model ConsentDocument {
   id             String @id @default(cuid())
-  professionalId String @unique
+  professionalId String
+  type           String @default("data_storage")
   title          String
   content        String
 
@@ -152,6 +156,8 @@ model ConsentDocument {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([professionalId, type])
 }
 
 model Client {
