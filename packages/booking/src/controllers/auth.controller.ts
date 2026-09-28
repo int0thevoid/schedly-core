@@ -14,10 +14,16 @@ const loginSchema = z.object({
 const SESSION_MS = 8 * 60 * 60 * 1000
 
 function authCookieOptions(): CookieOptions {
+  const isProduction = process.env.NODE_ENV === 'production'
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProduction,
+    // El frontend (Cloudflare Pages) y esta API (Railway) viven en dominios
+    // distintos, así que la cookie de sesión es cross-site — 'lax' hace que el
+    // navegador la guarde pero no la reenvíe en llamadas fetch (como /api/auth/me
+    // justo después del login). 'none' requiere `secure`, que ya está atado a
+    // producción. En local (mismo origen vía proxy de Vite) 'lax' es suficiente.
+    sameSite: isProduction ? 'none' : 'lax',
     path: '/',
   }
 }
