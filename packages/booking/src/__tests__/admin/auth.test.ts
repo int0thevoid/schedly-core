@@ -26,6 +26,7 @@ const PROFESSIONAL = {
   transferAccountType: null,
   transferAccountNumber: null,
   transferEmail: null,
+  photoUrl: null as string | null,
   createdAt: new Date(),
   updatedAt: new Date(),
 }
@@ -141,6 +142,7 @@ describe('GET /api/auth/me', () => {
       name: 'Ps. Stefany Osorio Alfaro',
       email: 'stefanyosorioalfaro@gmail.com',
       phone: '+56966898588',
+      photoUrl: null,
     })
     expect(res.body.data.passwordHash).toBeUndefined()
   })

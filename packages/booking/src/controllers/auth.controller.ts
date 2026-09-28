@@ -74,5 +74,6 @@ export async function me(req: Request, res: Response): Promise<void> {
     name: professional.name,
     email: professional.email,
     phone: professional.phone,
+    photoUrl: professional.photoUrl,
   })
 }
