@@ -53,6 +53,36 @@ export async function updateProfessional(req: Request, res: Response): Promise<v
   ok(res, { id: updated.id, name: updated.name, email: updated.email, phone: updated.phone, photoUrl: updated.photoUrl })
 }
 
+// Sirve la foto como imagen (no como JSON) para que la landing y las redes sociales (og:image)
+// la usen directo en un <img>/meta sin esperar a /api/config. `no-cache` + ETag hace que el
+// navegador revalide siempre (304 si no cambió), así una foto nueva se ve de inmediato.
+export async function getPublicProfessionalPhoto(_req: Request, res: Response): Promise<void> {
+  const professionalId = process.env.PROFESSIONAL_ID ?? ''
+  const professional = await prisma.professional.findUnique({
+    where: { id: professionalId },
+    select: { photoUrl: true },
+  })
+  const photoUrl = professional?.photoUrl ?? null
+  const match = photoUrl ? PHOTO_DATA_URL_PATTERN.exec(photoUrl) : null
+  if (!photoUrl || !match) {
+    const fallbackUrl = process.env.PROFESSIONAL_PHOTO_FALLBACK_URL
+    if (fallbackUrl) {
+      res.redirect(302, fallbackUrl)
+      return
+    }
+    fail(res, 'Photo not found', 404)
+    return
+  }
+  const base64 = photoUrl.slice(photoUrl.indexOf(',') + 1)
+  res.set({
+    'Content-Type': `image/${match[1]}`,
+    'Cache-Control': 'no-cache',
+    // helmet() pone same-origin por defecto, lo que bloquea el <img> desde el dominio del sitio
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+  })
+  res.send(Buffer.from(base64, 'base64'))
+}
+
 export async function changePassword(req: Request, res: Response): Promise<void> {
   const parsed = changePasswordSchema.safeParse(req.body)
   if (!parsed.success) {

@@ -85,7 +85,11 @@ function toBlock(b: DbScheduleBlock): ScheduleBlock {
   }
 }
 
-function toAppointment(a: DbAppointment): Appointment {
+type DbAppointmentWithService = DbAppointment & { service: Pick<DbService, 'bufferMinutes'> | null }
+
+// El descanso de cada cita existente es el de SU servicio (o el global del profesional),
+// no el del servicio que se está agendando — ver filterOccupiedSlots.
+function toAppointment(a: DbAppointmentWithService, defaultBufferMinutes: number): Appointment {
   return {
     id: a.id,
     serviceId: a.serviceId,
@@ -100,6 +104,7 @@ function toAppointment(a: DbAppointment): Appointment {
     ...(a.paymentAmount !== null ? { paymentAmount: a.paymentAmount } : {}),
     ...(a.notes !== null ? { notes: a.notes } : {}),
     createdAt: a.createdAt,
+    bufferMinutes: a.service?.bufferMinutes ?? defaultBufferMinutes,
   }
 }
 
@@ -112,7 +117,7 @@ async function fetchContextForDate(
   professional: Professional | null
   weeklySchedules: DbWeeklySchedule[]
   blocks: DbScheduleBlock[]
-  appointments: DbAppointment[]
+  appointments: DbAppointmentWithService[]
 }> {
   const { gte, lte } = dayRangeInTZ(dateStr, TZ)
   const [service, professional, weeklySchedules, blocks, appointments] = await Promise.all([
@@ -127,6 +132,7 @@ async function fetchContextForDate(
         startDateTime: { gte },
         endDateTime: { lte },
       },
+      include: { service: { select: { bufferMinutes: true } } },
     }),
   ])
   return { service, professional, weeklySchedules, blocks, appointments }
@@ -138,16 +144,17 @@ function computeSlots(
   professional: Professional | null,
   weeklySchedules: DbWeeklySchedule[],
   blocks: DbScheduleBlock[],
-  appointments: DbAppointment[],
+  appointments: DbAppointmentWithService[],
 ): TimeSlot[] {
   const date = new Date(`${dateStr}T12:00:00.000Z`)
+  const config = toConfig(professional)
   return getAvailableSlots(
     date,
     toService(service),
-    toConfig(professional),
+    config,
     weeklySchedules.map(toWeeklySchedule),
     blocks.map(toBlock),
-    appointments.map(toAppointment),
+    appointments.map((a) => toAppointment(a, config.defaultBufferMinutes)),
   )
 }
 
@@ -216,6 +223,7 @@ export async function getRangeAvailability(req: Request, res: Response): Promise
         startDateTime: { gte },
         endDateTime: { lte },
       },
+      include: { service: { select: { bufferMinutes: true } } },
     })
 
     result[dateStr] = computeSlots(dateStr, service, professional, weeklySchedules, blocks, appointments)

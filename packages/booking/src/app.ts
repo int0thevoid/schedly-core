@@ -23,6 +23,7 @@ import adminGoogleCalendarOauthRouter from './routes/admin/googleCalendarOauth.j
 import clientsRouter from './routes/clients.js'
 import { getTransferConfig } from './controllers/admin/transfer.controller.js'
 import { getPublicConfig } from './controllers/admin/config.controller.js'
+import { getPublicProfessionalPhoto } from './controllers/admin/professional.controller.js'
 import { getPublicConsentDocument, getPublicCancellationPolicy } from './controllers/admin/consent-document.controller.js'
 import { fail } from './lib/response.js'
 
@@ -71,6 +72,7 @@ app.use('/api/clients', clientsRouter)
 
 // Public: booking wizard needs these without auth
 app.get('/api/config', getPublicConfig)
+app.get('/api/professional/photo', getPublicProfessionalPhoto)
 app.get('/api/admin/transfer-config', getTransferConfig)
 app.get('/api/consent-document', getPublicConsentDocument)
 app.get('/api/cancellation-policy', getPublicCancellationPolicy)
