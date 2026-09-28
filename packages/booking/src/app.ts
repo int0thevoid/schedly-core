@@ -40,7 +40,9 @@ const app = express()
 
 app.use(helmet())
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }))
-app.use(express.json())
+// Límite elevado (default de Express es 100kb) para aceptar la foto de perfil como data URL
+// en el body de PATCH /api/admin/professional — ver professional.controller.ts.
+app.use(express.json({ limit: '6mb' }))
 app.use(cookieParser())
 
 // Defensa en profundidad contra fuerza bruta/abuso — no había ningún límite

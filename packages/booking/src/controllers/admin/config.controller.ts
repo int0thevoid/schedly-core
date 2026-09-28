@@ -25,6 +25,7 @@ function serializeConfig(p: {
   treatmentTypes?: string[]
   dailyDigestTime?: string
   cashPaymentEnabled?: boolean
+  photoUrl?: string | null
 }) {
   return {
     bookingWindowWeeks: p.bookingWindowWeeks,
@@ -36,6 +37,7 @@ function serializeConfig(p: {
     treatmentTypes: p.treatmentTypes ?? [],
     dailyDigestTime: p.dailyDigestTime ?? '16:00',
     cashPaymentEnabled: p.cashPaymentEnabled ?? true,
+    photoUrl: p.photoUrl ?? null,
   }
 }
 

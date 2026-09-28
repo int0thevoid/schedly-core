@@ -69,6 +69,61 @@ describe('PATCH /api/admin/professional', () => {
     expect(res.body.data.phone).toBe('+56999999999')
   })
 
+  it('actualiza la foto de perfil (data URL válida)', async () => {
+    const photoUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB'
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, photoUrl })
+
+    const res = await request(app)
+      .patch('/api/admin/professional')
+      .set('Cookie', `auth_token=${token()}`)
+      .send({ photoUrl })
+
+    expect(res.status).toBe(200)
+    expect(res.body.data.photoUrl).toBe(photoUrl)
+    expect(prismaMock.professional.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ photoUrl }) }),
+    )
+  })
+
+  it('permite borrar la foto de perfil enviando null', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, photoUrl: null })
+
+    const res = await request(app)
+      .patch('/api/admin/professional')
+      .set('Cookie', `auth_token=${token()}`)
+      .send({ photoUrl: null })
+
+    expect(res.status).toBe(200)
+    expect(res.body.data.photoUrl).toBeNull()
+  })
+
+  it('retorna 400 si photoUrl no es una data URL de imagen válida', async () => {
+    const res = await request(app)
+      .patch('/api/admin/professional')
+      .set('Cookie', `auth_token=${token()}`)
+      .send({ photoUrl: 'not-a-data-url' })
+    expect(res.status).toBe(400)
+  })
+
+  it('retorna 400 si photoUrl es un formato de imagen no soportado', async () => {
+    const res = await request(app)
+      .patch('/api/admin/professional')
+      .set('Cookie', `auth_token=${token()}`)
+      .send({ photoUrl: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' })
+    expect(res.status).toBe(400)
+  })
+
+  it('retorna 400 si photoUrl excede el tamaño máximo', async () => {
+    const hugeBase64 = 'A'.repeat(4_500_001)
+    const res = await request(app)
+      .patch('/api/admin/professional')
+      .set('Cookie', `auth_token=${token()}`)
+      .send({ photoUrl: `data:image/png;base64,${hugeBase64}` })
+    expect(res.status).toBe(400)
+  })
+
   it('retorna 400 si el body está vacío', async () => {
     const res = await request(app)
       .patch('/api/admin/professional')
