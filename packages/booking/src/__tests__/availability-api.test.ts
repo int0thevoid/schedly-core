@@ -58,6 +58,33 @@ describe('GET /api/availability', () => {
   })
 })
 
+describe('GET /api/availability — descanso propio de cada cita existente', () => {
+  it('ofrece una individual (45+15) a las 15:00 después de una pareja (50+10) de 14:00', async () => {
+    prismaMock.service.findUnique.mockResolvedValue({ ...SERVICE, duration: 45, bufferMinutes: 15 })
+    prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, defaultBufferMinutes: 15 })
+    prismaMock.weeklySchedule.findMany.mockResolvedValue([
+      { id: 'ws1', professionalId: 'pro1', dayOfWeek: 1, startTime: '14:00', endTime: '16:00', serviceIds: [], isActive: true, createdAt: new Date(), updatedAt: new Date() },
+    ])
+    // Lunes 05-10-2026 en Chile es UTC-3: 14:00 local = 17:00Z
+    prismaMock.appointment.findMany.mockResolvedValue([
+      {
+        id: 'couple', professionalId: 'pro1', serviceId: 's-couple', clientName: 'Pareja', clientEmail: 'p@test.cl',
+        clientPhone: '+56900000000', startDateTime: new Date('2026-10-05T17:00:00Z'), endDateTime: new Date('2026-10-05T17:50:00Z'),
+        modality: 'presential', status: 'confirmed', paymentStatus: 'paid', paymentAmount: null, notes: null,
+        createdAt: new Date(), service: { bufferMinutes: 10 },
+      },
+    ])
+
+    const res = await request(app).get('/api/availability?serviceId=s1&date=2026-10-05')
+
+    expect(res.status).toBe(200)
+    expect(res.body.data.map((s: { startDateTime: string }) => s.startDateTime)).toEqual(['2026-10-05T18:00:00.000Z'])
+    expect(prismaMock.appointment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ include: { service: { select: { bufferMinutes: true } } } }),
+    )
+  })
+})
+
 describe('GET /api/availability/range', () => {
   it('returns slots map for a range', async () => {
     prismaMock.service.findUnique.mockResolvedValue(SERVICE)

@@ -484,6 +484,65 @@ describe('filterOccupiedSlots', () => {
   })
 })
 
+// ─── Buffer propio de cada cita (servicios con distinta duración) ───────────
+// Reglas de la consulta: individual 45 min + 15 de descanso, pareja 50 + 10. Ambas
+// ocupan exactamente una hora, así que la siguiente sesión va en la hora cerrada siguiente.
+
+describe('filterOccupiedSlots con buffer propio de cada cita', () => {
+  const COUPLE_DURATION = 50
+  const COUPLE_BUFFER = 10
+  const INDIVIDUAL_DURATION = 45
+  const INDIVIDUAL_BUFFER = 15
+
+  function slotAt(slots: ReturnType<typeof generateDaySlots>, hhmm: string) {
+    return slots.find(s => toSantiagoHHMM(s.startDateTime) === hhmm)
+  }
+
+  it('una individual a las 15:00 cabe después de una pareja de 14:00 (50+10 termina 15:00)', () => {
+    const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, INDIVIDUAL_DURATION, INDIVIDUAL_BUFFER)
+    const couple = {
+      ...makeAppointment(makeSantiagoDate('2024-01-15', '14:00'), makeSantiagoDate('2024-01-15', '14:50')),
+      bufferMinutes: COUPLE_BUFFER,
+    }
+    const result = filterOccupiedSlots(slots, [couple], INDIVIDUAL_BUFFER)
+    expect(slotAt(result, '14:00')?.isAvailable).toBe(false)
+    expect(slotAt(result, '15:00')?.isAvailable).toBe(true)
+  })
+
+  it('una pareja a las 15:00 cabe después de una individual de 14:00 (45+15 termina 15:00)', () => {
+    const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, COUPLE_DURATION, COUPLE_BUFFER)
+    const individual = {
+      ...makeAppointment(makeSantiagoDate('2024-01-15', '14:00'), makeSantiagoDate('2024-01-15', '14:45')),
+      bufferMinutes: INDIVIDUAL_BUFFER,
+    }
+    const result = filterOccupiedSlots(slots, [individual], COUPLE_BUFFER)
+    expect(slotAt(result, '14:00')?.isAvailable).toBe(false)
+    expect(slotAt(result, '15:00')?.isAvailable).toBe(true)
+  })
+
+  it('una pareja a las 14:00 cabe antes de una individual de 15:00', () => {
+    const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, COUPLE_DURATION, COUPLE_BUFFER)
+    const individual = {
+      ...makeAppointment(makeSantiagoDate('2024-01-15', '15:00'), makeSantiagoDate('2024-01-15', '15:45')),
+      bufferMinutes: INDIVIDUAL_BUFFER,
+    }
+    const result = filterOccupiedSlots(slots, [individual], COUPLE_BUFFER)
+    expect(slotAt(result, '14:00')?.isAvailable).toBe(true)
+    expect(slotAt(result, '15:00')?.isAvailable).toBe(false)
+  })
+
+  it('con la agenda llena de individuales, una pareja no tiene ningún horario', () => {
+    const slots = generateDaySlots(MONDAY_JAN_15, SCHEDULE_MON_FRI, COUPLE_DURATION, COUPLE_BUFFER)
+    const fullDay = slots.map(slot => {
+      const hhmm = toSantiagoHHMM(slot.startDateTime)
+      const start = makeSantiagoDate('2024-01-15', hhmm)
+      return { ...makeAppointment(start, new Date(start.getTime() + INDIVIDUAL_DURATION * 60_000)), bufferMinutes: INDIVIDUAL_BUFFER }
+    })
+    const result = filterOccupiedSlots(slots, fullDay, COUPLE_BUFFER)
+    expect(result.filter(s => s.isAvailable)).toHaveLength(0)
+  })
+})
+
 // ─── getAvailableSlots ───────────────────────────────────────────────────────
 
 describe('getAvailableSlots', () => {

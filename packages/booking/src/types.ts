@@ -43,6 +43,8 @@ export interface Appointment {
   paymentAmount?: number
   notes?: string
   createdAt: Date
+  /** Descanso posterior propio del servicio de esta cita; si falta, se usa el del slot evaluado. */
+  bufferMinutes?: number
 }
 
 export interface TimeSlot {
