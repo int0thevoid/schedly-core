@@ -31,6 +31,9 @@ const ALLOWED_ORIGINS = [
   'http://192.168.1.75:5173',
   'https://stefanyoa-test.int0thesrv.cl',
   'https://stefanyosorio-test.int0thesrv.cl',
+  'https://stefany-osorio-web.pages.dev',
+  'https://psstefanyosorio.cl',
+  'https://www.psstefanyosorio.cl',
 ]
 
 const app = express()
