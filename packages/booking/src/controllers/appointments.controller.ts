@@ -61,10 +61,6 @@ const rescheduleSchema = z.object({
   newStartDateTime: z.string().datetime({ offset: true }),
 })
 
-const cancelSchema = z.object({
-  reason: z.string().optional(),
-})
-
 function isSameCalendarDay(a: Date, b: Date): boolean {
   return (
     a.getUTCFullYear() === b.getUTCFullYear() &&
@@ -85,8 +81,6 @@ function calculateTokenExpiry(startDateTime: Date): Date {
   expires.setUTCHours(23, 0, 0, 0)
   return expires
 }
-
-const CANCEL_WINDOW_MS = 24 * 60 * 60 * 1000
 
 export async function createAppointment(req: Request, res: Response): Promise<void> {
   const parsed = createSchema.safeParse(req.body)
@@ -195,19 +189,6 @@ async function sendNewAppointmentEmails(appointment: Appointment, service: Servi
   } catch (err) {
     console.error(`[notifications] failed to send emails for appointment ${appointment.id}`, err)
   }
-}
-
-export async function getAppointment(req: Request, res: Response): Promise<void> {
-  const { id } = req.params
-  const appointment = await prisma.appointment.findUnique({
-    where: { id },
-    include: { service: true },
-  })
-  if (!appointment) {
-    fail(res, 'Appointment not found', 404)
-    return
-  }
-  ok(res, appointment)
 }
 
 export async function getAppointmentByToken(req: Request, res: Response): Promise<void> {
@@ -392,9 +373,11 @@ async function sendRescheduleEmail(
 }
 
 /** Endpoint público (sin autenticación) enlazado desde emails de confirmación y recordatorio. */
+// Por token (no por ID): el ID no es una credencial. No se valida tokenExpiresAt porque la
+// confirmación ocurre justo antes de la cita, cuando la ventana de cancelación ya cerró.
 export async function confirmAttendance(req: Request, res: Response): Promise<void> {
-  const { id } = req.params
-  const appointment = await prisma.appointment.findUnique({ where: { id } })
+  const { token } = req.params as { token: string }
+  const appointment = await prisma.appointment.findUnique({ where: { appointmentToken: token } })
   if (!appointment) {
     res.status(404).type('html').send(confirmAttendancePageTemplate({ status: 'not-found' }))
     return
@@ -408,42 +391,11 @@ export async function confirmAttendance(req: Request, res: Response): Promise<vo
   }
 
   await prisma.appointment.update({
-    where: { id },
+    where: { id: appointment.id },
     data: { attendanceConfirmed: true, attendanceConfirmedAt: new Date() },
   })
 
   res.type('html').send(confirmAttendancePageTemplate({ status: 'confirmed', professionalName: professional?.name }))
 }
 
-export async function cancelAppointment(req: Request, res: Response): Promise<void> {
-  const parsed = cancelSchema.safeParse(req.body)
-  if (!parsed.success) {
-    fail(res, parsed.error.issues[0]?.message ?? 'Invalid body', 400)
-    return
-  }
-
-  const { id } = req.params
-  const appointment = await prisma.appointment.findUnique({ where: { id } })
-
-  if (!appointment) {
-    fail(res, 'Appointment not found', 404)
-    return
-  }
-  if (!['pending', 'confirmed'].includes(appointment.status)) {
-    fail(res, 'Cannot cancel appointment in current status', 400)
-    return
-  }
-  if (appointment.startDateTime.getTime() - Date.now() < CANCEL_WINDOW_MS) {
-    fail(res, 'Cancellation window has passed (24h minimum)', 400)
-    return
-  }
-
-  const updated = await prisma.appointment.update({
-    where: { id },
-    data: { status: 'cancelled' },
-  })
-  ok(res, updated)
-
-  void cancelGoogleMeetEventForAppointment(appointment)
-}
 
