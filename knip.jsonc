@@ -1,11 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "ignore": [
-    // Plantilla para anular reservas impagas al vencer paymentDeadline: funcionalidad pendiente de decisión
-    "packages/notifications/src/templates/appointment-auto-cancelled.ts"
-  ],
   // Binarios provistos por el entorno (runner de deploy / CI), no por dependencias del paquete
   "ignoreBinaries": ["prisma", "pm2", "eslint"],
-  // Usado por el cliente generado en src/generated (ignorado arriba)
+  // Lo usa el cliente Prisma generado en packages/booking/src/generated
   "ignoreDependencies": ["@prisma/client"]
 }
