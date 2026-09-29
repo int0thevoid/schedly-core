@@ -91,6 +91,21 @@ describe('buildAppointmentConfirmationData', () => {
 })
 
 describe('buildAppointmentReminderData', () => {
+  afterEach(() => {
+    delete process.env.PUBLIC_API_URL
+  })
+
+  it('builds the confirm-attendance link from PUBLIC_API_URL and the appointment token', () => {
+    process.env.PUBLIC_API_URL = 'https://api.example.cl'
+    const data = buildAppointmentReminderData(APPOINTMENT, PROFESSIONAL, 'day_before')
+    expect(data.confirmAttendanceUrl).toBe('https://api.example.cl/api/appointments/token/tok_abc123/confirm-attendance')
+  })
+
+  it('omits the confirm-attendance link when PUBLIC_API_URL is not configured', () => {
+    const data = buildAppointmentReminderData(APPOINTMENT, PROFESSIONAL, 'day_before')
+    expect(data.confirmAttendanceUrl).toBeUndefined()
+  })
+
   it('includes a Google Calendar URL', () => {
     const data = buildAppointmentReminderData(APPOINTMENT, PROFESSIONAL, 'same_day')
     expect(data.googleCalendarUrl).toContain('calendar.google.com')

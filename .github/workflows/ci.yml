@@ -39,3 +39,6 @@ jobs:
 
       - name: Test @schedly/booking
         run: cd packages/booking && pnpm test
+
+      - name: Detectar código sin uso (knip)
+        run: pnpm dlx knip@5 --no-progress

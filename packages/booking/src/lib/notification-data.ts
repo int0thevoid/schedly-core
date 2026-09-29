@@ -36,13 +36,8 @@ export function formatAppointmentDate(date: Date, timezone: string): string {
   return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${rest}`
 }
 
-export function formatAppointmentTime(date: Date, timezone: string): string {
+function formatAppointmentTime(date: Date, timezone: string): string {
   return new Intl.DateTimeFormat('es-CL', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
-}
-
-export function formatAppointmentTimeRange(start: Date, end: Date, timezone: string): string {
-  const fmt = new Intl.DateTimeFormat('es-CL', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false })
-  return `${fmt.format(start)} - ${fmt.format(end)}`
 }
 
 function toModality(modality: string): 'presential' | 'online' {
@@ -57,6 +52,14 @@ function buildAdminAgendaUrl(): string {
 function buildTokenUrl(token: string, action: 'modificar' | 'anular'): string {
   const base = process.env.FRONTEND_URL ?? 'http://localhost:5173'
   return `${base}/cita/${token}/${action}`
+}
+
+// El endpoint de confirmación responde HTML desde la API (no desde el frontend), así que el link
+// necesita la URL pública de la API. Sin PUBLIC_API_URL o sin token no se ofrece el botón.
+function buildConfirmAttendanceUrl(token: string | null): string | undefined {
+  const base = process.env.PUBLIC_API_URL
+  if (!base || !token) return undefined
+  return `${base}/api/appointments/token/${encodeURIComponent(token)}/confirm-attendance`
 }
 
 function buildBookingUrl(): string {
@@ -75,7 +78,7 @@ function buildGoogleCalendarUrl(appointment: AppointmentWithService, professiona
   })
 }
 
-export function getAppointmentColorInfo(appointment: {
+function getAppointmentColorInfo(appointment: {
   paymentStatus: string
   attendanceConfirmed: boolean
 }): { color: string; colorLabel: string } {
@@ -139,6 +142,7 @@ export function buildAppointmentReminderData(
     paymentStatus: appointment.paymentStatus === 'paid' ? 'paid' : 'unpaid',
     price: appointment.service.price,
     transferData: buildTransferData(professional),
+    confirmAttendanceUrl: buildConfirmAttendanceUrl(appointment.appointmentToken),
   }
 }
 

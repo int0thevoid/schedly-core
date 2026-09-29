@@ -1,4 +1,4 @@
-import { COLORS, contactFooter, escapeHtml, googleMapsLink, renderLayout, type EmailTemplate } from './layout.js'
+import { COLORS, confirmAttendanceButton, contactFooter, escapeHtml, googleMapsLink, renderLayout, type EmailTemplate } from './layout.js'
 import { renderPaymentDueSection, type TransferData } from './payment-reminder.js'
 
 export interface AppointmentReminderData {
@@ -21,6 +21,8 @@ export interface AppointmentReminderData {
   paymentStatus: 'paid' | 'unpaid'
   price: number
   transferData: TransferData
+  /** Link público (por token) para confirmar asistencia; sin él no se muestra el botón. */
+  confirmAttendanceUrl?: string
 }
 
 function renderLocation(data: AppointmentReminderData): string {
@@ -76,6 +78,8 @@ export function appointmentReminderTemplate(data: AppointmentReminderData): Emai
     ${renderLocation(data)}
 
     <p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Llega / conéctate unos minutos antes para comenzar puntual.</p>
+
+    ${data.confirmAttendanceUrl ? `<div style="margin-bottom:24px;">${confirmAttendanceButton(data.confirmAttendanceUrl)}</div>` : ''}
 
     ${hasRealCalendarInvite(data) ? '' : `<div style="text-align:center;margin-bottom:${data.paymentStatus === 'unpaid' ? '24px' : '0'};">
       <a href="${escapeHtml(data.googleCalendarUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.primary};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;border:1px solid ${COLORS.primary};">📅 Agregar a Google Calendar</a>
