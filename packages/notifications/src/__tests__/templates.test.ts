@@ -214,6 +214,18 @@ describe('appointmentReminderTemplate', () => {
     const { html } = appointmentReminderTemplate(baseData)
     expect(html).not.toContain('Buenos Aires')
   })
+
+  it('shows the "Confirmar asistencia" button when a confirm link is provided', () => {
+    const url = 'https://api.example.cl/api/appointments/token/tok_1/confirm-attendance'
+    const { html } = appointmentReminderTemplate({ ...baseData, confirmAttendanceUrl: url })
+    expect(html).toContain('Confirmar asistencia')
+    expect(html).toContain(url)
+  })
+
+  it('omits the "Confirmar asistencia" button without a confirm link', () => {
+    const { html } = appointmentReminderTemplate(baseData)
+    expect(html).not.toContain('Confirmar asistencia')
+  })
 })
 
 describe('professionalNewBookingTemplate', () => {
