@@ -230,22 +230,34 @@ describe('POST /api/appointments', () => {
   })
 })
 
-describe('GET /api/appointments/:id', () => {
-  it('returns appointment with service', async () => {
+// Rutas por ID eliminadas: el ID no es una credencial. GET devolvía la cita completa
+// (datos del paciente + appointmentToken) y PATCH cancelaba sin autenticación.
+describe('rutas públicas por ID eliminadas', () => {
+  it('GET /api/appointments/:id ya no expone la cita', async () => {
     prismaMock.appointment.findUnique.mockResolvedValue({ ...APPOINTMENT, service: SERVICE })
     const res = await request(app).get('/api/appointments/apt1')
-    expect(res.status).toBe(200)
-    expect(res.body.data.id).toBe('apt1')
+    expect(res.status).toBe(404)
+    expect(res.body?.data).toBeUndefined()
+    expect(prismaMock.appointment.findUnique).not.toHaveBeenCalled()
   })
 
-  it('returns 404 when not found', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue(null)
-    const res = await request(app).get('/api/appointments/bad')
+  it('PATCH /api/appointments/:id/cancel ya no cancela sin token', async () => {
+    const future = new Date(Date.now() + 48 * 60 * 60 * 1000)
+    prismaMock.appointment.findUnique.mockResolvedValue({ ...APPOINTMENT, startDateTime: future })
+    const res = await request(app).patch('/api/appointments/apt1/cancel').send({})
     expect(res.status).toBe(404)
+    expect(prismaMock.appointment.update).not.toHaveBeenCalled()
+  })
+
+  it('GET /api/appointments/:id/confirm-attendance ya no confirma por ID', async () => {
+    prismaMock.appointment.findUnique.mockResolvedValue({ ...APPOINTMENT, attendanceConfirmed: false })
+    const res = await request(app).get('/api/appointments/apt1/confirm-attendance')
+    expect(res.status).toBe(404)
+    expect(prismaMock.appointment.update).not.toHaveBeenCalled()
   })
 })
 
-describe('GET /api/appointments/:id/confirm-attendance', () => {
+describe('GET /api/appointments/token/:token/confirm-attendance', () => {
   const PROFESSIONAL = { id: 'pro1', name: 'Ps. Stefany Osorio' }
 
   it('marks attendance as confirmed and returns a thank-you page', async () => {
@@ -253,11 +265,12 @@ describe('GET /api/appointments/:id/confirm-attendance', () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     prismaMock.appointment.update.mockResolvedValue({ ...APPOINTMENT, attendanceConfirmed: true })
 
-    const res = await request(app).get('/api/appointments/apt1/confirm-attendance')
+    const res = await request(app).get('/api/appointments/token/tok_abc/confirm-attendance')
 
     expect(res.status).toBe(200)
     expect(res.headers['content-type']).toContain('text/html')
     expect(res.text).toContain('¡Gracias por confirmar!')
+    expect(prismaMock.appointment.findUnique).toHaveBeenCalledWith({ where: { appointmentToken: 'tok_abc' } })
     expect(prismaMock.appointment.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'apt1' },
@@ -266,10 +279,10 @@ describe('GET /api/appointments/:id/confirm-attendance', () => {
     )
   })
 
-  it('returns a not-found page when the appointment does not exist', async () => {
+  it('returns a not-found page when the token does not exist', async () => {
     prismaMock.appointment.findUnique.mockResolvedValue(null)
 
-    const res = await request(app).get('/api/appointments/bad/confirm-attendance')
+    const res = await request(app).get('/api/appointments/token/bad/confirm-attendance')
 
     expect(res.status).toBe(404)
     expect(res.text).toContain('Cita no encontrada')
@@ -280,37 +293,11 @@ describe('GET /api/appointments/:id/confirm-attendance', () => {
     prismaMock.appointment.findUnique.mockResolvedValue({ ...APPOINTMENT, attendanceConfirmed: true })
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
 
-    const res = await request(app).get('/api/appointments/apt1/confirm-attendance')
+    const res = await request(app).get('/api/appointments/token/tok_abc/confirm-attendance')
 
     expect(res.status).toBe(200)
     expect(res.text).toContain('Ya habías confirmado')
     expect(prismaMock.appointment.update).not.toHaveBeenCalled()
-  })
-})
-
-describe('PATCH /api/appointments/:id/cancel', () => {
-  it('cancels a pending appointment within window', async () => {
-    const future = new Date(Date.now() + 48 * 60 * 60 * 1000)
-    const apt = { ...APPOINTMENT, startDateTime: future, endDateTime: new Date(future.getTime() + 50 * 60_000) }
-    prismaMock.appointment.findUnique.mockResolvedValue(apt)
-    prismaMock.appointment.update.mockResolvedValue({ ...apt, status: 'cancelled' })
-
-    const res = await request(app).patch('/api/appointments/apt1/cancel').send({})
-    expect(res.status).toBe(200)
-    expect(res.body.data.status).toBe('cancelled')
-  })
-
-  it('rejects if within 24h', async () => {
-    const soon = new Date(Date.now() + 60 * 60 * 1000)
-    prismaMock.appointment.findUnique.mockResolvedValue({ ...APPOINTMENT, startDateTime: soon })
-    const res = await request(app).patch('/api/appointments/apt1/cancel').send({})
-    expect(res.status).toBe(400)
-  })
-
-  it('rejects if already cancelled', async () => {
-    prismaMock.appointment.findUnique.mockResolvedValue({ ...APPOINTMENT, status: 'cancelled' })
-    const res = await request(app).patch('/api/appointments/apt1/cancel').send({})
-    expect(res.status).toBe(400)
   })
 })
 
