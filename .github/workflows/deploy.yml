@@ -1,7 +1,7 @@
 name: Deploy to test server
 
 # Corre en el runner self-hosted instalado en el servidor de pruebas
-# (stefanyoa-test.int0thesrv.cl). Se dispara solo cuando algo se mezcla
+# (stefanyosorio-test.int0thesrv.cl). Se dispara solo cuando algo se mezcla
 # a develop, nunca en PRs — así el runner nunca ejecuta código de una
 # rama que todavía no fue aprobada.
 on:
