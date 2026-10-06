@@ -32,7 +32,7 @@ interface FindDelegate {
   findUnique(args: { where: unknown }): Promise<Row | null>
 }
 
-export interface AuditEntry {
+interface AuditEntry {
   action: string
   entity: string
   entityId?: string | null
@@ -89,7 +89,7 @@ function professionalIdOf(model: string, row: Row | null, context: AuditContext 
 }
 
 /** Escribe una entrada con el actor de la petición o tarea en curso. Nunca lanza. */
-export async function writeAudit(base: PrismaClient, entry: AuditEntry): Promise<void> {
+async function writeAudit(base: PrismaClient, entry: AuditEntry): Promise<void> {
   const context = getAuditContext()
   try {
     await base.auditLog.create({
