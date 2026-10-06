@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { fail } from '../lib/response.js'
+import { setAuditAdmin } from '../lib/audit-context.js'
 
 export const AUTH_COOKIE_NAME = 'auth_token'
 
@@ -32,6 +33,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
       return
     }
     req.professionalId = payload.professionalId
+    setAuditAdmin(payload.professionalId)
     next()
   } catch {
     fail(res, 'Invalid token', 401)

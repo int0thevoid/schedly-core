@@ -2,7 +2,8 @@ import type { Request, Response } from 'express'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { confirmAttendancePageTemplate } from '@schedly/notifications'
-import { prisma } from '../lib/prisma.js'
+import { prisma, type TransactionClient } from '../lib/prisma.js'
+import { recordAuditEvent } from '../lib/audit.js'
 import { fail, ok } from '../lib/response.js'
 import {
   buildAppointmentConfirmationData,
@@ -14,7 +15,7 @@ import {
 } from '../lib/notification-data.js'
 import { getEmailService } from '../lib/email-service.js'
 import { ensureGoogleMeetEvent, cancelGoogleMeetEventForAppointment } from '../lib/google-meet.js'
-import { Prisma, type Appointment, type Service } from '../generated/prisma/index.js'
+import type { Appointment, Service } from '../generated/prisma/index.js'
 
 // P2034 = "Transaction failed due to a write conflict or a deadlock. Please retry
 // your transaction" — se compara por código en vez de `instanceof` porque el tipo
@@ -31,7 +32,7 @@ function isSerializationConflictError(err: unknown): boolean {
  * horario en simultáneo. Sin esto, dos reservas para el mismo horario
  * podían quedar ambas activas (ver docs/deuda-tecnica.md).
  */
-async function runSerializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>, attempts = 3): Promise<T> {
+async function runSerializable<T>(fn: (tx: TransactionClient) => Promise<T>, attempts = 3): Promise<T> {
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       return await prisma.$transaction(fn, { isolationLevel: 'Serializable' })
@@ -332,6 +333,18 @@ export async function rescheduleByToken(req: Request, res: Response): Promise<vo
       })
 
       return created
+    })
+
+    await recordAuditEvent({
+      action: 'rescheduled',
+      entity: 'Appointment',
+      entityId: originalAppointment.id,
+      professionalId: originalAppointment.professionalId,
+      changes: {
+        from: originalAppointment.startDateTime.toISOString(),
+        to: newAppointment.startDateTime.toISOString(),
+        newAppointmentId: newAppointment.id,
+      },
     })
 
     ok(res, newAppointment)

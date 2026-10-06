@@ -177,3 +177,26 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Historial de cambios para auditoría: cada creación, modificación o eliminación de datos y eventos
+// clave (login de la admin, correos). Se escribe solo desde lib/audit.ts; se conserva 2 años.
+model AuditLog {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  professionalId String?
+  // admin | patient | system | anonymous
+  actorType      String
+  actorId        String?
+  // create | update | delete | upsert | <evento> (ej. rescheduled, login_failed, email_sent)
+  action         String
+  entity         String
+  entityId       String?
+  // update: { campo: { from, to } } · create/delete: snapshot · eventos: datos del evento
+  changes        Json?
+  source         String?
+  ip             String?
+  userAgent      String?
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}

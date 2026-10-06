@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import request from 'supertest'
 
 vi.mock('../lib/prisma.js', () => ({ prisma: prismaMock }))
@@ -59,6 +59,14 @@ describe('GET /api/availability', () => {
 })
 
 describe('GET /api/availability — descanso propio de cada cita existente', () => {
+  // Fecha fija una semana antes: con la fecha real, desde el 05-10-2026 la anticipación mínima excluye el día.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-28T12:00:00Z') })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('ofrece una individual (45+15) a las 15:00 después de una pareja (50+10) de 14:00', async () => {
     prismaMock.service.findUnique.mockResolvedValue({ ...SERVICE, duration: 45, bufferMinutes: 15 })
     prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, defaultBufferMinutes: 15 })
