@@ -46,6 +46,10 @@ export const prismaMock = {
     create: vi.fn(),
     upsert: vi.fn(),
   },
+  auditLog: {
+    findMany: vi.fn(),
+    create: vi.fn(),
+  },
   $transaction: vi.fn(),
 }
 

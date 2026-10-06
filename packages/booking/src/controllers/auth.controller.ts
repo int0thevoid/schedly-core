@@ -3,6 +3,8 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
+import { recordAuditEvent } from '../lib/audit.js'
+import { setAuditAdmin } from '../lib/audit-context.js'
 import { fail, ok } from '../lib/response.js'
 import { AUTH_COOKIE_NAME } from '../middleware/auth.js'
 
@@ -40,6 +42,13 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   // Same error message for missing user and wrong password — prevents user enumeration
   if (!professional?.passwordHash || !(await bcrypt.compare(password, professional.passwordHash))) {
+    await recordAuditEvent({
+      action: 'login_failed',
+      entity: 'Auth',
+      entityId: professional?.id ?? null,
+      professionalId: professional?.id ?? null,
+      changes: { email },
+    })
     fail(res, 'Credenciales incorrectas', 401)
     return
   }
@@ -50,6 +59,9 @@ export async function login(req: Request, res: Response): Promise<void> {
     secret,
     { expiresIn: '8h' },
   )
+
+  setAuditAdmin(professional.id)
+  await recordAuditEvent({ action: 'login_succeeded', entity: 'Auth', entityId: professional.id, changes: { email } })
 
   res.cookie(AUTH_COOKIE_NAME, token, { ...authCookieOptions(), maxAge: SESSION_MS })
   ok(res, { success: true })

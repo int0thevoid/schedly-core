@@ -21,12 +21,14 @@ import adminConsentDocumentRouter from './routes/admin/consentDocument.js'
 import adminCancellationPolicyRouter from './routes/admin/cancellationPolicy.js'
 import adminGoogleCalendarOauthRouter from './routes/admin/googleCalendarOauth.js'
 import adminFinanceRouter from './routes/admin/finance.js'
+import adminAuditRouter from './routes/admin/audit.js'
 import clientsRouter from './routes/clients.js'
 import { getTransferConfig } from './controllers/admin/transfer.controller.js'
 import { getPublicConfig } from './controllers/admin/config.controller.js'
 import { getPublicProfessionalPhoto } from './controllers/admin/professional.controller.js'
 import { getPublicConsentDocument, getPublicCancellationPolicy } from './controllers/admin/consent-document.controller.js'
 import { fail } from './lib/response.js'
+import { actorTypeForPath, runWithAuditContext, sanitizeSource } from './lib/audit-context.js'
 
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
@@ -46,6 +48,22 @@ app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }))
 // en el body de PATCH /api/admin/professional — ver professional.controller.ts.
 app.use(express.json({ limit: '6mb' }))
 app.use(cookieParser())
+
+// Contexto de auditoría (US-089): quién origina los cambios de cada petición. requireAuth lo
+// completa como admin; el sitio público lo usan pacientes. Ver lib/audit.ts.
+app.use((req, _res, next) => {
+  const forwarded = req.headers['x-forwarded-for']
+  const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim() || req.ip
+  runWithAuditContext(
+    {
+      actorType: actorTypeForPath(req.path),
+      source: sanitizeSource(req.method, req.originalUrl),
+      ip,
+      userAgent: req.headers['user-agent']?.slice(0, 300),
+    },
+    next,
+  )
+})
 
 // Defensa en profundidad contra fuerza bruta/abuso — no había ningún límite
 // de tasa en ningún endpoint, incluyendo el login admin.
@@ -91,6 +109,7 @@ app.use('/api/admin/consent-document', adminConsentDocumentRouter)
 app.use('/api/admin/cancellation-policy', adminCancellationPolicyRouter)
 app.use('/api/admin/google-calendar', adminGoogleCalendarOauthRouter)
 app.use('/api/admin/finance', adminFinanceRouter)
+app.use('/api/admin/audit', adminAuditRouter)
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err)
