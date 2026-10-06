@@ -11,6 +11,7 @@ import {
   buildAppointmentCancelledByPatientData,
   buildNewBookingForProfessionalData,
   buildProfessionalCancellationNoticeData,
+  buildProfessionalRescheduleNoticeData,
   type AppointmentWithService,
 } from '../lib/notification-data.js'
 import { getEmailService } from '../lib/email-service.js'
@@ -376,10 +377,23 @@ async function sendRescheduleEmail(
     const newAppointmentWithMeet = await ensureGoogleMeetEvent(newAppointment, newAppointment.service, professional.name)
     const newAppointmentForEmail = { ...newAppointmentWithMeet, service: newAppointment.service }
 
-    await getEmailService().sendAppointmentModified(
-      newAppointmentForEmail.clientEmail,
-      buildAppointmentModifiedData(originalAppointment, newAppointmentForEmail, professional),
-    )
+    // Correo a la paciente y aviso a la profesional (US-085): independientes, si uno falla el otro igual sale.
+    const emailService = getEmailService()
+    const results = await Promise.allSettled([
+      emailService.sendAppointmentModified(
+        newAppointmentForEmail.clientEmail,
+        buildAppointmentModifiedData(originalAppointment, newAppointmentForEmail, professional),
+      ),
+      emailService.sendProfessionalRescheduleNotice(
+        professional.email,
+        buildProfessionalRescheduleNoticeData(originalAppointment, newAppointmentForEmail, professional),
+      ),
+    ])
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error(`[notifications] failed to send reschedule email for appointment ${newAppointment.id}`, result.reason)
+      }
+    }
   } catch (err) {
     console.error(`[notifications] failed to send reschedule email for appointment ${newAppointment.id}`, err)
   }
