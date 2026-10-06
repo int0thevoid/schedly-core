@@ -4,6 +4,7 @@ import type {
   AppointmentReminderData,
   AppointmentCancelledByPatientData,
   ProfessionalCancellationNoticeData,
+  ProfessionalRescheduleNoticeData,
   ProfessionalNewBookingData,
   DailyDigestAppointment,
   DailyDigestData,
@@ -220,6 +221,26 @@ export function buildProfessionalCancellationNoticeData(
     serviceName: appointment.service.name,
     date: formatAppointmentDate(appointment.startDateTime, professional.timezone),
     startTime: formatAppointmentTime(appointment.startDateTime, professional.timezone),
+    adminUrl: buildAdminAgendaUrl(),
+  }
+}
+
+/** Aviso a la profesional cuando una paciente reagenda con el enlace del correo (US-085). */
+export function buildProfessionalRescheduleNoticeData(
+  originalAppointment: AppointmentWithService,
+  newAppointment: AppointmentWithService,
+  professional: Professional,
+): ProfessionalRescheduleNoticeData {
+  return {
+    clientName: newAppointment.clientName,
+    clientEmail: newAppointment.clientEmail,
+    clientPhone: newAppointment.clientPhone,
+    serviceName: newAppointment.service.name,
+    modality: newAppointment.modality === 'online' ? 'online' : 'presential',
+    previousDate: formatAppointmentDate(originalAppointment.startDateTime, professional.timezone),
+    previousStartTime: formatAppointmentTime(originalAppointment.startDateTime, professional.timezone),
+    newDate: formatAppointmentDate(newAppointment.startDateTime, professional.timezone),
+    newStartTime: formatAppointmentTime(newAppointment.startDateTime, professional.timezone),
     adminUrl: buildAdminAgendaUrl(),
   }
 }

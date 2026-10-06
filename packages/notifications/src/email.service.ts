@@ -5,6 +5,7 @@ import { professionalNewBookingTemplate, type ProfessionalNewBookingData } from 
 import { appointmentModifiedTemplate, type AppointmentModifiedData } from './templates/appointment-modified.js'
 import { appointmentCancelledByPatientTemplate, type AppointmentCancelledByPatientData } from './templates/appointment-cancelled-by-patient.js'
 import { professionalCancellationNoticeTemplate, type ProfessionalCancellationNoticeData } from './templates/professional-cancellation-notice.js'
+import { professionalRescheduleNoticeTemplate, type ProfessionalRescheduleNoticeData } from './templates/professional-reschedule-notice.js'
 import { reviewRequestTemplate, type ReviewRequestData } from './templates/review-request.js'
 import { dailyDigestTemplate, type DailyDigestData } from './templates/daily-digest.js'
 import { generateICSFile } from './utils/ics-generator.js'
@@ -86,6 +87,11 @@ export class EmailService {
 
   async sendProfessionalCancellationNotice(to: string, data: ProfessionalCancellationNoticeData): Promise<void> {
     const { subject, html } = professionalCancellationNoticeTemplate(data)
+    await this.send(to, subject, html)
+  }
+
+  async sendProfessionalRescheduleNotice(to: string, data: ProfessionalRescheduleNoticeData): Promise<void> {
+    const { subject, html } = professionalRescheduleNoticeTemplate(data)
     await this.send(to, subject, html)
   }
 

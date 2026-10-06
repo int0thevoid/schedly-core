@@ -6,6 +6,7 @@ import { appointmentModifiedTemplate, type AppointmentModifiedData } from '../te
 import { appointmentCancelledByPatientTemplate, type AppointmentCancelledByPatientData } from '../templates/appointment-cancelled-by-patient.js'
 import { professionalCancellationNoticeTemplate, type ProfessionalCancellationNoticeData } from '../templates/professional-cancellation-notice.js'
 import { reviewRequestTemplate, type ReviewRequestData } from '../templates/review-request.js'
+import { professionalRescheduleNoticeTemplate, type ProfessionalRescheduleNoticeData } from '../templates/professional-reschedule-notice.js'
 import { confirmAttendancePageTemplate } from '../templates/confirm-attendance-page.js'
 import { dailyDigestTemplate, type DailyDigestData } from '../templates/daily-digest.js'
 import { generateGoogleCalendarUrl } from '../utils/google-calendar.js'
@@ -544,5 +545,40 @@ describe('confirmAttendancePageTemplate', () => {
   it('shows a not-found message for "not-found"', () => {
     const html = confirmAttendancePageTemplate({ status: 'not-found' })
     expect(html).toContain('Cita no encontrada')
+  })
+})
+
+describe('professionalRescheduleNoticeTemplate', () => {
+  const baseData: ProfessionalRescheduleNoticeData = {
+    clientName: 'Ana Pérez',
+    clientEmail: 'ana@test.com',
+    clientPhone: '+56912345678',
+    serviceName: 'Terapia individual',
+    modality: 'presential',
+    previousDate: 'Jueves, 8 de octubre de 2026',
+    previousStartTime: '19:00',
+    newDate: 'Sábado, 10 de octubre de 2026',
+    newStartTime: '16:00',
+    adminUrl: 'https://admin.example.com/admin/agenda',
+  }
+
+  it('el asunto indica la paciente y el cambio de fecha', () => {
+    const { subject } = professionalRescheduleNoticeTemplate(baseData)
+    expect(subject).toBe('🔁 Cita reagendada — Ana Pérez: Jueves, 8 de octubre de 2026 → Sábado, 10 de octubre de 2026')
+  })
+
+  it('muestra la hora anterior, la nueva, el servicio, la modalidad, el contacto y el enlace al panel', () => {
+    const { html } = professionalRescheduleNoticeTemplate(baseData)
+    expect(html).toContain('Jueves, 8 de octubre de 2026, 19:00')
+    expect(html).toContain('Sábado, 10 de octubre de 2026, 16:00')
+    expect(html).toContain('Terapia individual · Presencial')
+    expect(html).toContain('ana@test.com')
+    expect(html).toContain('+56912345678')
+    expect(html).toContain('https://admin.example.com/admin/agenda')
+  })
+
+  it('escapa el HTML de los datos de la paciente', () => {
+    const { html } = professionalRescheduleNoticeTemplate({ ...baseData, clientName: '<script>x</script>' })
+    expect(html).not.toContain('<script>x</script>')
   })
 })
