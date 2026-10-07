@@ -130,3 +130,50 @@ describe('GET /api/admin/finance/summary', () => {
     expect(res.body.data.previousMonth).toMatchObject({ year: 2026, month: 12 })
   })
 })
+
+describe('GET /api/admin/finance/trend (US-082)', () => {
+  beforeEach(() => {
+    resetMocks()
+    process.env.PROFESSIONAL_ID = 'pro1'
+  })
+
+  it('devuelve 12 meses con lo cobrado y el mismo mes del año anterior', async () => {
+    prismaMock.appointment.findMany.mockResolvedValue([
+      // octubre 2026 (Santiago)
+      { startDateTime: new Date('2026-10-05T15:00:00Z'), paymentAmount: 30000 },
+      { startDateTime: new Date('2026-10-20T15:00:00Z'), paymentAmount: 35000 },
+      // octubre 2025 → año anterior de octubre 2026
+      { startDateTime: new Date('2025-10-10T15:00:00Z'), paymentAmount: 25000 },
+      // 01-11-2025 00:30 en Santiago es todavía 31-10 en UTC: debe contar en noviembre
+      { startDateTime: new Date('2025-11-01T03:30:00Z'), paymentAmount: 42000 },
+      { startDateTime: new Date('2026-02-03T15:00:00Z'), paymentAmount: null },
+    ])
+    const res = await request(app).get('/api/admin/finance/trend?year=2026&month=10').set('Cookie', `auth_token=${token()}`)
+    expect(res.status).toBe(200)
+    const months = res.body.data.months
+    expect(months).toHaveLength(12)
+    expect(months[0]).toMatchObject({ year: 2025, month: 11, collected: 42000, previousYearCollected: 0 })
+    expect(months[11]).toEqual({ year: 2026, month: 10, collected: 65000, previousYearCollected: 25000 })
+    expect(months.find((m: { month: number }) => m.month === 2)).toMatchObject({ collected: 0 })
+  })
+
+  it('consulta 24 meses de pagos del profesional, sin canceladas ni regalías, incluyendo pagos sin medio', async () => {
+    prismaMock.appointment.findMany.mockResolvedValue([])
+    await request(app).get('/api/admin/finance/trend?year=2026&month=10').set('Cookie', `auth_token=${token()}`)
+    const where = prismaMock.appointment.findMany.mock.calls[0][0].where
+    expect(where).toMatchObject({
+      professionalId: 'pro1',
+      status: { not: 'cancelled' },
+      paymentStatus: 'paid',
+      OR: [{ paymentMethod: null }, { paymentMethod: { not: 'gift' } }],
+    })
+    // Noviembre 2024 en Santiago (UTC-3 en verano) → 24 meses hasta octubre 2026
+    expect(where.startDateTime.gte.toISOString()).toBe('2024-11-01T03:00:00.000Z')
+    expect(where.startDateTime.lte.toISOString()).toBe('2026-11-01T02:59:59.999Z')
+  })
+
+  it('requiere sesión', async () => {
+    const res = await request(app).get('/api/admin/finance/trend')
+    expect(res.status).toBe(401)
+  })
+})
