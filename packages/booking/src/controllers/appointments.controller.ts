@@ -306,7 +306,7 @@ export async function rescheduleByToken(req: Request, res: Response): Promise<vo
   }
 }
 
-export interface RescheduleOptions {
+interface RescheduleOptions {
   newStart: Date
   /** Estado de la cita nueva: la paciente reagenda → 'pending'; desde el panel se mantiene el original. */
   status: string
