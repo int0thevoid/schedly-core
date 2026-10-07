@@ -25,5 +25,7 @@ export async function lookupClient(req: Request, res: Response): Promise<void> {
     select: { name: true, phone: true, dataConsentGiven: true },
   })
 
-  ok(res, client)
+  // Solo se autocompletan datos de pacientes que dieron su consentimiento (US-083): existen fichas
+  // creadas desde el panel sin consentimiento, y este endpoint es público.
+  ok(res, client?.dataConsentGiven ? client : null)
 }

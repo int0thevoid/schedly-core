@@ -38,6 +38,7 @@ export const prismaMock = {
     findMany: vi.fn(),
     findUnique: vi.fn(),
     findFirst: vi.fn(),
+    create: vi.fn(),
     update: vi.fn(),
     upsert: vi.fn(),
   },
