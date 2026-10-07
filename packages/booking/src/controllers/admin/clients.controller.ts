@@ -14,6 +14,17 @@ const updateSchema = z.object({
   treatmentType: z.string().nullable(),
 })
 
+const saveSchema = z.object({
+  name: z.string().trim().min(1),
+  email: z.string().trim().email(),
+  phone: z.string().trim().optional(),
+  rut: z.string().trim().optional(),
+})
+
+// Tope solo para búsquedas (buscador del formulario de cita manual); la lista completa de
+// Pacientes trae todos.
+const SEARCH_LIMIT = 20
+
 const CLIENT_SELECT = {
   id: true,
   name: true,
@@ -44,11 +55,12 @@ export async function listClients(req: Request, res: Response): Promise<void> {
     if (name) where = { ...where, name: { contains: name, mode: 'insensitive' } }
   }
 
+  const isSearch = Boolean(q || email || name)
   const clients = await prisma.client.findMany({
     where,
     select: CLIENT_SELECT,
     orderBy: { name: 'asc' },
-    take: 20,
+    ...(isSearch ? { take: SEARCH_LIMIT } : {}),
   })
 
   res.json({ success: true, data: clients })
@@ -115,4 +127,36 @@ export async function updateClient(req: Request, res: Response): Promise<void> {
   })
 
   ok(res, client)
+}
+
+/**
+ * Guarda o actualiza la ficha de un paciente desde una cita manual del panel (US-083), para que el
+ * buscador lo encuentre la próxima vez. Busca por correo sin distinguir mayúsculas para no duplicar.
+ * Nunca toca el consentimiento: un paciente nuevo queda sin consentimiento y uno existente lo conserva.
+ */
+export async function saveClient(req: Request, res: Response): Promise<void> {
+  const parsed = saveSchema.safeParse(req.body)
+  if (!parsed.success) {
+    fail(res, parsed.error.issues[0]?.message ?? 'Cuerpo inválido', 400)
+    return
+  }
+  const { name, email, phone, rut } = parsed.data
+
+  const existing = await prisma.client.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    select: { id: true },
+  })
+
+  const client = existing
+    ? await prisma.client.update({
+        where: { id: existing.id },
+        data: { name, ...(phone ? { phone } : {}), ...(rut ? { rut } : {}) },
+        select: CLIENT_SELECT,
+      })
+    : await prisma.client.create({
+        data: { email, name, phone: phone || null, rut: rut || null, dataConsentGiven: false },
+        select: CLIENT_SELECT,
+      })
+
+  ok(res, client, existing ? 200 : 201)
 }

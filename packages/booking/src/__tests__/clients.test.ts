@@ -44,6 +44,15 @@ describe('GET /api/clients/lookup', () => {
     )
   })
 
+  it('no devuelve datos de un paciente sin consentimiento (US-083)', async () => {
+    prismaMock.client.findFirst.mockResolvedValue({ name: 'Ana García', phone: '+56912345678', dataConsentGiven: false })
+    const byEmail = await request(app).get('/api/clients/lookup?email=ana@example.com')
+    expect(byEmail.status).toBe(200)
+    expect(byEmail.body.data).toBeNull()
+    const byRut = await request(app).get('/api/clients/lookup?rut=12345678-9')
+    expect(byRut.body.data).toBeNull()
+  })
+
   it('returns null data when no client matches', async () => {
     prismaMock.client.findFirst.mockResolvedValue(null)
     const res = await request(app).get('/api/clients/lookup?email=desconocido@example.com')
