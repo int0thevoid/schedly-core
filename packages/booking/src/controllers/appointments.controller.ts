@@ -290,73 +290,15 @@ export async function rescheduleByToken(req: Request, res: Response): Promise<vo
     return
   }
 
-  const newStart = new Date(parsed.data.newStartDateTime)
-  const newEnd = new Date(newStart.getTime() + originalAppointment.service.duration * 60_000)
-  const newToken = generateToken()
-  const newTokenExpiresAt = calculateTokenExpiry(newStart)
-
   try {
-    const newAppointment = await runSerializable(async (tx) => {
-      const conflict = await tx.appointment.findFirst({
-        where: {
-          professionalId: originalAppointment.professionalId,
-          status: { not: 'cancelled' },
-          startDateTime: { lt: newEnd },
-          endDateTime: { gt: newStart },
-        },
-      })
-      if (conflict) throw new Error('SLOT_TAKEN')
-
-      const created = await tx.appointment.create({
-        data: {
-          professionalId: originalAppointment.professionalId,
-          serviceId: originalAppointment.serviceId,
-          clientName: originalAppointment.clientName,
-          clientEmail: originalAppointment.clientEmail,
-          clientPhone: originalAppointment.clientPhone,
-          startDateTime: newStart,
-          endDateTime: newEnd,
-          modality: originalAppointment.modality,
-          notes: originalAppointment.notes,
-          status: 'pending',
-          paymentStatus: 'unpaid',
-          paymentMethod: originalAppointment.paymentMethod,
-          bookingFlow: 'advance',
-          appointmentToken: newToken,
-          tokenExpiresAt: newTokenExpiresAt,
-        },
-        include: { service: true },
-      })
-
-      await tx.appointment.update({
-        where: { id: originalAppointment.id },
-        data: { status: 'cancelled' },
-      })
-
-      return created
+    const newAppointment = await rescheduleAppointment(originalAppointment, {
+      newStart: new Date(parsed.data.newStartDateTime),
+      status: 'pending',
+      rescheduledBy: 'patient',
     })
-
-    await recordAuditEvent({
-      action: 'rescheduled',
-      entity: 'Appointment',
-      entityId: originalAppointment.id,
-      professionalId: originalAppointment.professionalId,
-      changes: {
-        from: originalAppointment.startDateTime.toISOString(),
-        to: newAppointment.startDateTime.toISOString(),
-        newAppointmentId: newAppointment.id,
-      },
-    })
-
     ok(res, newAppointment)
-
-    void sendRescheduleEmail(originalAppointment, newAppointment)
   } catch (err) {
-    if (err instanceof Error && err.message === 'SLOT_TAKEN') {
-      fail(res, 'Slot is no longer available', 409)
-      return
-    }
-    if (isSerializationConflictError(err)) {
+    if (isSlotTakenError(err)) {
       fail(res, 'Slot is no longer available', 409)
       return
     }
@@ -364,9 +306,100 @@ export async function rescheduleByToken(req: Request, res: Response): Promise<vo
   }
 }
 
+export interface RescheduleOptions {
+  newStart: Date
+  /** Estado de la cita nueva: la paciente reagenda → 'pending'; desde el panel se mantiene el original. */
+  status: string
+  rescheduledBy: 'patient' | 'admin'
+  service?: Service
+  modality?: string
+  clientName?: string
+  clientPhone?: string
+  notes?: string | null
+}
+
+/** El horario elegido ya está ocupado (incluye conflictos de serialización por reservas simultáneas). */
+export function isSlotTakenError(err: unknown): boolean {
+  return (err instanceof Error && err.message === 'SLOT_TAKEN') || isSerializationConflictError(err)
+}
+
+/**
+ * Reagenda una cita: crea la nueva y cancela la original en una sola transacción, registra el
+ * reagendamiento en el historial y envía un único correo a la paciente ("cita modificada") y un
+ * aviso a la profesional. La usan el enlace del correo (paciente) y el panel (US-085, US-090).
+ * El pago de la original se traspasa a la nueva.
+ */
+export async function rescheduleAppointment(
+  originalAppointment: AppointmentWithService,
+  options: RescheduleOptions,
+): Promise<AppointmentWithService> {
+  const service = options.service ?? originalAppointment.service
+  const newStart = options.newStart
+  const newEnd = new Date(newStart.getTime() + service.duration * 60_000)
+
+  const newAppointment = await runSerializable(async (tx) => {
+    const conflict = await tx.appointment.findFirst({
+      where: {
+        id: { not: originalAppointment.id },
+        professionalId: originalAppointment.professionalId,
+        status: { not: 'cancelled' },
+        startDateTime: { lt: newEnd },
+        endDateTime: { gt: newStart },
+      },
+    })
+    if (conflict) throw new Error('SLOT_TAKEN')
+
+    const created = await tx.appointment.create({
+      data: {
+        professionalId: originalAppointment.professionalId,
+        serviceId: service.id,
+        clientName: options.clientName ?? originalAppointment.clientName,
+        clientEmail: originalAppointment.clientEmail,
+        clientPhone: options.clientPhone ?? originalAppointment.clientPhone,
+        startDateTime: newStart,
+        endDateTime: newEnd,
+        modality: options.modality ?? originalAppointment.modality,
+        notes: options.notes !== undefined ? options.notes : originalAppointment.notes,
+        status: options.status,
+        paymentStatus: originalAppointment.paymentStatus,
+        paymentAmount: originalAppointment.paymentAmount,
+        paymentMethod: originalAppointment.paymentMethod,
+        bookingFlow: 'advance',
+        appointmentToken: generateToken(),
+        tokenExpiresAt: calculateTokenExpiry(newStart),
+      },
+      include: { service: true },
+    })
+
+    await tx.appointment.update({
+      where: { id: originalAppointment.id },
+      data: { status: 'cancelled' },
+    })
+
+    return created
+  })
+
+  await recordAuditEvent({
+    action: 'rescheduled',
+    entity: 'Appointment',
+    entityId: originalAppointment.id,
+    professionalId: originalAppointment.professionalId,
+    changes: {
+      from: originalAppointment.startDateTime.toISOString(),
+      to: newAppointment.startDateTime.toISOString(),
+      newAppointmentId: newAppointment.id,
+      by: options.rescheduledBy,
+    },
+  })
+
+  void sendRescheduleEmail(originalAppointment, newAppointment, options.rescheduledBy)
+  return newAppointment
+}
+
 async function sendRescheduleEmail(
   originalAppointment: Appointment & { service: Service },
   newAppointment: Appointment & { service: Service },
+  rescheduledBy: 'patient' | 'admin',
 ): Promise<void> {
   try {
     void cancelGoogleMeetEventForAppointment(originalAppointment)
@@ -377,7 +410,8 @@ async function sendRescheduleEmail(
     const newAppointmentWithMeet = await ensureGoogleMeetEvent(newAppointment, newAppointment.service, professional.name)
     const newAppointmentForEmail = { ...newAppointmentWithMeet, service: newAppointment.service }
 
-    // Correo a la paciente y aviso a la profesional (US-085): independientes, si uno falla el otro igual sale.
+    // Un solo correo a la paciente y un aviso a la profesional (US-085, US-090): independientes,
+    // si uno falla el otro igual sale. Nunca se envían anulación ni confirmación de cita nueva.
     const emailService = getEmailService()
     const results = await Promise.allSettled([
       emailService.sendAppointmentModified(
@@ -386,7 +420,7 @@ async function sendRescheduleEmail(
       ),
       emailService.sendProfessionalRescheduleNotice(
         professional.email,
-        buildProfessionalRescheduleNoticeData(originalAppointment, newAppointmentForEmail, professional),
+        buildProfessionalRescheduleNoticeData(originalAppointment, newAppointmentForEmail, professional, rescheduledBy),
       ),
     ])
     for (const result of results) {

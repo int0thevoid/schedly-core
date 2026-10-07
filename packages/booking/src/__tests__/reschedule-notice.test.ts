@@ -5,11 +5,21 @@ vi.mock('../lib/prisma.js', () => ({ prisma: prismaMock }))
 
 const sendAppointmentModified = vi.fn()
 const sendProfessionalRescheduleNotice = vi.fn()
+const sendAppointmentConfirmation = vi.fn()
+const sendAppointmentCancelledByPatient = vi.fn()
+const sendNewBookingToProfessional = vi.fn()
 vi.mock('../lib/email-service.js', () => ({
-  getEmailService: () => ({ sendAppointmentModified, sendProfessionalRescheduleNotice }),
+  getEmailService: () => ({
+    sendAppointmentModified,
+    sendProfessionalRescheduleNotice,
+    sendAppointmentConfirmation,
+    sendAppointmentCancelledByPatient,
+    sendNewBookingToProfessional,
+  }),
 }))
 
 import { prismaMock, resetMocks } from './helpers/prisma-mock.js'
+import jwt from 'jsonwebtoken'
 import app from '../app.js'
 
 const SERVICE = { id: 's1', name: 'Terapia individual', professionalId: 'pro1', modality: 'presential', duration: 50, price: 35000 }
@@ -71,5 +81,74 @@ describe('aviso a la profesional al reagendar (US-085)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     await reschedule()
     expect(sendAppointmentModified).toHaveBeenCalledWith('ana@test.com', expect.anything())
+  })
+})
+
+describe('reagendar desde el panel (US-090)', () => {
+  const PAID = { ...ORIGINAL, status: 'confirmed', paymentStatus: 'paid', paymentAmount: 35000, paymentMethod: 'transfer' }
+  const adminCookie = () => `auth_token=${jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'dev-secret')}`
+
+  beforeEach(() => {
+    resetMocks()
+    for (const fn of [sendAppointmentModified, sendProfessionalRescheduleNotice, sendAppointmentConfirmation, sendAppointmentCancelledByPatient, sendNewBookingToProfessional]) {
+      fn.mockReset().mockResolvedValue(undefined)
+    }
+    arrangeReschedule()
+    prismaMock.appointment.findFirst.mockReset()
+    // 1ª llamada: la cita original (del profesional); 2ª: el chequeo de choque dentro de la transacción
+    prismaMock.appointment.findFirst.mockResolvedValueOnce(PAID).mockResolvedValueOnce(null)
+  })
+
+  async function rescheduleFromPanel(body: Record<string, unknown> = { newStartDateTime: '2026-10-10T19:00:00Z' }) {
+    return request(app).post('/api/admin/appointments/apt1/reschedule').set('Cookie', adminCookie()).send(body)
+  }
+
+  it('envía un único correo de reagendamiento a la paciente y el aviso a Stefany, sin anulación ni confirmación nueva', async () => {
+    const res = await rescheduleFromPanel()
+    expect(res.status).toBe(200)
+    await vi.waitFor(() => expect(sendProfessionalRescheduleNotice).toHaveBeenCalled())
+    expect(sendAppointmentModified).toHaveBeenCalledTimes(1)
+    expect(sendAppointmentModified).toHaveBeenCalledWith('ana@test.com', expect.anything())
+    expect(sendProfessionalRescheduleNotice).toHaveBeenCalledWith('stefany@test.com', expect.objectContaining({ rescheduledBy: 'admin' }))
+    expect(sendAppointmentCancelledByPatient).not.toHaveBeenCalled()
+    expect(sendAppointmentConfirmation).not.toHaveBeenCalled()
+    expect(sendNewBookingToProfessional).not.toHaveBeenCalled()
+  })
+
+  it('crea la nueva y cancela la original, conservando estado y pago', async () => {
+    await rescheduleFromPanel()
+    expect(prismaMock.appointment.create.mock.calls[0][0].data).toMatchObject({
+      startDateTime: new Date('2026-10-10T19:00:00Z'),
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      paymentAmount: 35000,
+      paymentMethod: 'transfer',
+    })
+    expect(prismaMock.appointment.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'apt1' }, data: { status: 'cancelled' } }))
+  })
+
+  it('el chequeo de horario ocupado no choca con la propia cita', async () => {
+    await rescheduleFromPanel()
+    expect(prismaMock.appointment.findFirst.mock.calls[1][0].where).toMatchObject({ id: { not: 'apt1' } })
+  })
+
+  it('responde 409 si el horario está ocupado y no envía correos', async () => {
+    prismaMock.appointment.findFirst.mockReset().mockResolvedValueOnce(PAID).mockResolvedValueOnce({ id: 'otra' })
+    const res = await rescheduleFromPanel()
+    expect(res.status).toBe(409)
+    expect(prismaMock.appointment.create).not.toHaveBeenCalled()
+    expect(sendAppointmentModified).not.toHaveBeenCalled()
+  })
+
+  it('no permite reagendar citas de otro profesional ni citas canceladas', async () => {
+    prismaMock.appointment.findFirst.mockReset().mockResolvedValueOnce(null)
+    expect((await rescheduleFromPanel()).status).toBe(404)
+    prismaMock.appointment.findFirst.mockReset().mockResolvedValueOnce({ ...PAID, status: 'cancelled' })
+    expect((await rescheduleFromPanel()).status).toBe(409)
+  })
+
+  it('requiere sesión de administradora', async () => {
+    const res = await request(app).post('/api/admin/appointments/apt1/reschedule').send({ newStartDateTime: '2026-10-10T19:00:00Z' })
+    expect(res.status).toBe(401)
   })
 })

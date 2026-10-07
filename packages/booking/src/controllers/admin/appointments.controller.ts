@@ -10,6 +10,7 @@ import {
   type AppointmentWithService,
 } from '../../lib/notification-data.js'
 import { addDaysToDateStr, dateKeyInTZ, dayRangeInTZ, todayInTZ } from '../../lib/date.js'
+import { isSlotTakenError, rescheduleAppointment } from '../appointments.controller.js'
 
 const TZ = 'America/Santiago'
 
@@ -43,6 +44,15 @@ const paymentSchema = z.union([
     paymentStatus: z.literal('unpaid'),
   }),
 ])
+
+const adminRescheduleSchema = z.object({
+  newStartDateTime: z.string().datetime({ offset: true }),
+  serviceId: z.string().min(1).optional(),
+  modality: z.enum(['presential', 'online']).optional(),
+  clientName: z.string().trim().min(1).optional(),
+  clientPhone: z.string().trim().optional(),
+  notes: z.string().nullable().optional(),
+})
 
 const attendanceSchema = z.object({
   attended: z.boolean(),
@@ -297,3 +307,59 @@ export async function notifyAppointmentConfirmation(req: Request, res: Response)
   ok(res, { sent: true })
 }
 
+
+/**
+ * Reagenda una cita desde el panel (US-090): crea la nueva y cancela la original en una sola
+ * operación, con un único correo de reagendamiento a la paciente y un aviso a la profesional.
+ * Antes el panel creaba una cita nueva y cancelaba la original por separado, y la paciente recibía
+ * la confirmación de una cita nueva más "Tu cita ha sido anulada".
+ */
+export async function rescheduleAdminAppointment(req: Request, res: Response): Promise<void> {
+  const parsed = adminRescheduleSchema.safeParse(req.body)
+  if (!parsed.success) {
+    fail(res, parsed.error.issues[0]?.message ?? 'Invalid body', 400)
+    return
+  }
+  const id = String(req.params.id)
+  const professionalId = req.professionalId ?? ''
+  const original = await prisma.appointment.findFirst({ where: { id, professionalId }, include: { service: true } })
+  if (!original) {
+    fail(res, 'Appointment not found', 404)
+    return
+  }
+  if (original.status === 'cancelled') {
+    fail(res, 'La cita ya está cancelada', 409)
+    return
+  }
+
+  const { newStartDateTime, serviceId, modality, clientName, clientPhone, notes } = parsed.data
+  let service = original.service
+  if (serviceId && serviceId !== original.serviceId) {
+    const found = await prisma.service.findFirst({ where: { id: serviceId, professionalId } })
+    if (!found) {
+      fail(res, 'Service not found', 404)
+      return
+    }
+    service = found
+  }
+
+  try {
+    const newAppointment = await rescheduleAppointment(original, {
+      newStart: new Date(newStartDateTime),
+      status: original.status,
+      rescheduledBy: 'admin',
+      service,
+      modality,
+      clientName,
+      clientPhone,
+      notes,
+    })
+    ok(res, newAppointment)
+  } catch (err) {
+    if (isSlotTakenError(err)) {
+      fail(res, 'Slot is no longer available', 409)
+      return
+    }
+    throw err
+  }
+}
