@@ -4,6 +4,7 @@ import {
   listMonthlyAppointments,
   listWeeklyAppointments,
   notifyAppointmentConfirmation,
+  rescheduleAdminAppointment,
   updateAppointmentAttendance,
   updateAppointmentOutcome,
   updateAppointmentPayment,
@@ -15,6 +16,7 @@ router.get('/weekly', listWeeklyAppointments)
 router.get('/monthly', listMonthlyAppointments)
 router.get('/', listAdminAppointments)
 router.patch('/:id/status', updateAppointmentStatus)
+router.post('/:id/reschedule', rescheduleAdminAppointment)
 router.patch('/:id/payment', updateAppointmentPayment)
 router.patch('/:id/attendance', updateAppointmentAttendance)
 router.patch('/:id/outcome', updateAppointmentOutcome)

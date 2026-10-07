@@ -11,6 +11,8 @@ export interface ProfessionalRescheduleNoticeData {
   newDate: string
   newStartTime: string
   adminUrl: string
+  /** Quién reagendó: la paciente (enlace del correo) o la profesional (panel). Por defecto, la paciente. */
+  rescheduledBy?: 'patient' | 'admin'
 }
 
 export function professionalRescheduleNoticeTemplate(data: ProfessionalRescheduleNoticeData): EmailTemplate {
@@ -19,7 +21,9 @@ export function professionalRescheduleNoticeTemplate(data: ProfessionalReschedul
 
   const bodyHtml = `
     <p style="margin:0 0 20px;font-size:16px;">
-      <strong>${escapeHtml(data.clientName)}</strong> reagendó su cita.
+      ${data.rescheduledBy === 'admin'
+        ? `Reagendaste desde el panel la cita de <strong>${escapeHtml(data.clientName)}</strong>. Ya le enviamos el aviso con el nuevo horario.`
+        : `<strong>${escapeHtml(data.clientName)}</strong> reagendó su cita.`}
     </p>
 
     <div style="background-color:${COLORS.primaryFaint};border-radius:8px;padding:20px;margin-bottom:20px;">
