@@ -239,7 +239,7 @@ export async function cancelByToken(req: Request, res: Response): Promise<void> 
 
   await prisma.appointment.update({
     where: { id: appointment.id },
-    data: { status: 'cancelled' },
+    data: { status: 'cancelled', cancelledAt: new Date(), cancellationType: 'patient' },
   })
 
   void cancelGoogleMeetEventForAppointment(appointment)
@@ -373,7 +373,7 @@ export async function rescheduleAppointment(
 
     await tx.appointment.update({
       where: { id: originalAppointment.id },
-      data: { status: 'cancelled' },
+      data: { status: 'cancelled', cancelledAt: new Date(), cancellationType: 'rescheduled', rescheduledToId: created.id },
     })
 
     return created

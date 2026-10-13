@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import {
   listAdminAppointments,
+  listCancelledAppointments,
   listMonthlyAppointments,
   listWeeklyAppointments,
   notifyAppointmentConfirmation,
@@ -14,6 +15,7 @@ import {
 const router = Router()
 router.get('/weekly', listWeeklyAppointments)
 router.get('/monthly', listMonthlyAppointments)
+router.get('/cancelled', listCancelledAppointments)
 router.get('/', listAdminAppointments)
 router.patch('/:id/status', updateAppointmentStatus)
 router.post('/:id/reschedule', rescheduleAdminAppointment)
