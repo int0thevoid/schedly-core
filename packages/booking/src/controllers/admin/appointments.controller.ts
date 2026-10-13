@@ -139,6 +139,52 @@ export async function listMonthlyAppointments(req: Request, res: Response): Prom
   ok(res, grouped)
 }
 
+/**
+ * Registro de citas canceladas de un mes (US-088), por fecha de la cita. La Agenda no las muestra:
+ * esta es su única vista. Las reagendadas incluyen la fecha de la cita nueva.
+ */
+export async function listCancelledAppointments(req: Request, res: Response): Promise<void> {
+  const parsed = monthlySchema.safeParse(req.query)
+  if (!parsed.success) {
+    fail(res, parsed.error.issues[0]?.message ?? 'Invalid params', 400)
+    return
+  }
+
+  const year = Number(parsed.data.year)
+  const month = Number(parsed.data.month)
+  const professionalId = req.professionalId ?? ''
+  const firstDayStr = `${year}-${String(month).padStart(2, '0')}-01`
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const lastDayStr = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      professionalId,
+      status: 'cancelled',
+      startDateTime: {
+        gte: dayRangeInTZ(firstDayStr, TZ).gte,
+        lte: dayRangeInTZ(lastDayStr, TZ).lte,
+      },
+    },
+    include: { service: true },
+    orderBy: { startDateTime: 'asc' },
+  })
+
+  const newIds = appointments.map((a) => a.rescheduledToId).filter((id): id is string => Boolean(id))
+  const newAppointments = newIds.length
+    ? await prisma.appointment.findMany({
+        where: { id: { in: newIds }, professionalId },
+        select: { id: true, startDateTime: true, status: true },
+      })
+    : []
+  const byId = new Map(newAppointments.map((a) => [a.id, a]))
+
+  ok(res, appointments.map((a) => ({
+    ...a,
+    rescheduledTo: a.rescheduledToId ? byId.get(a.rescheduledToId) ?? null : null,
+  })))
+}
+
 export async function listAdminAppointments(req: Request, res: Response): Promise<void> {
   const parsed = listSchema.safeParse(req.query)
   if (!parsed.success) {
@@ -188,9 +234,20 @@ export async function updateAppointmentStatus(req: Request, res: Response): Prom
     fail(res, 'Appointment not found', 404)
     return
   }
+  const cancelled = parsed.data.status === 'cancelled'
+  // Volver a anular una cancelada pisaría su registro (ej. una reagendada pasaría a "anulada").
+  if (cancelled && appointment.status === 'cancelled') {
+    fail(res, 'Appointment is already cancelled', 409)
+    return
+  }
   const updated = await prisma.appointment.update({
     where: { id },
-    data: { status: parsed.data.status },
+    data: {
+      status: parsed.data.status,
+      cancelledAt: cancelled ? new Date() : null,
+      cancellationType: cancelled ? 'admin' : null,
+      rescheduledToId: null,
+    },
   })
   ok(res, updated)
 

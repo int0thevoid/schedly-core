@@ -362,8 +362,11 @@ describe('PATCH /api/appointments/token/:token/cancel', () => {
     const res = await request(app).patch('/api/appointments/token/tok_valid/cancel')
     expect(res.status).toBe(200)
     expect(res.body.data.success).toBe(true)
+    // Registro de canceladas (US-088): anulada por la paciente, con fecha.
     expect(prismaMock.appointment.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'cancelled', cancellationType: 'patient', cancelledAt: expect.any(Date) }),
+      }),
     )
   })
 
@@ -406,8 +409,14 @@ describe('PATCH /api/appointments/token/:token/reschedule', () => {
     })
     expect(res.status).toBe(200)
     expect(prismaMock.appointment.create).toHaveBeenCalled()
+    // Registro de canceladas (US-088): la original queda como reagendada y apunta a la nueva.
     expect(prismaMock.appointment.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'apt1' }, data: expect.objectContaining({ status: 'cancelled' }) }),
+      expect.objectContaining({
+        where: { id: 'apt1' },
+        data: expect.objectContaining({
+          status: 'cancelled', cancellationType: 'rescheduled', rescheduledToId: 'apt2', cancelledAt: expect.any(Date),
+        }),
+      }),
     )
   })
 

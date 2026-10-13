@@ -227,6 +227,35 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
     ))
   })
 
+  it('al anular desde el panel registra quién y cuándo (US-088)', async () => {
+    prismaMock.appointment.findFirst.mockResolvedValue(APT)
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, status: 'cancelled' })
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/status')
+      .set('Cookie', `auth_token=${token()}`)
+      .send({ status: 'cancelled' })
+
+    expect(res.status).toBe(200)
+    expect(prismaMock.appointment.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'cancelled', cancellationType: 'admin', cancelledAt: expect.any(Date) }),
+    }))
+  })
+
+  it('no vuelve a anular una cita ya cancelada (no pisa su registro ni reenvía el correo)', async () => {
+    prismaMock.appointment.findFirst.mockResolvedValue({ ...APT, status: 'cancelled', cancellationType: 'rescheduled' })
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/status')
+      .set('Cookie', `auth_token=${token()}`)
+      .send({ status: 'cancelled' })
+
+    expect(res.status).toBe(409)
+    expect(prismaMock.appointment.update).not.toHaveBeenCalled()
+    expect(sendAppointmentCancelledByPatientMock).not.toHaveBeenCalled()
+  })
+
   it('does not send a cancellation email when status is set to confirmed', async () => {
     prismaMock.appointment.findFirst.mockResolvedValue(APT)
     prismaMock.appointment.update.mockResolvedValue({ ...APT, status: 'confirmed' })
@@ -253,6 +282,49 @@ describe('PATCH /api/admin/appointments/:id/status', () => {
 
     expect(res.status).toBe(200)
     expect(res.body.data.status).toBe('cancelled')
+  })
+})
+
+describe('GET /api/admin/appointments/cancelled', () => {
+  it('returns 401 without token', async () => {
+    const res = await request(app).get('/api/admin/appointments/cancelled?year=2026&month=6')
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 400 when year or month is missing', async () => {
+    const res = await request(app).get('/api/admin/appointments/cancelled?year=2026').set('Cookie', `auth_token=${token()}`)
+    expect(res.status).toBe(400)
+  })
+
+  it('lista solo las canceladas del mes, de la profesional, por fecha de la cita', async () => {
+    prismaMock.appointment.findMany.mockResolvedValue([])
+    const res = await request(app).get('/api/admin/appointments/cancelled?year=2026&month=6').set('Cookie', `auth_token=${token()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.data).toEqual([])
+    expect(prismaMock.appointment.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        professionalId: 'pro1',
+        status: 'cancelled',
+        startDateTime: { gte: dayRangeInTZ('2026-06-01', TZ).gte, lte: dayRangeInTZ('2026-06-30', TZ).lte },
+      },
+    }))
+  })
+
+  it('incluye la fecha de la cita nueva en las reagendadas', async () => {
+    const rescheduled = { ...APT, status: 'cancelled', cancellationType: 'rescheduled', rescheduledToId: 'a2', cancelledAt: new Date('2026-06-01T12:00:00Z') }
+    const byAdmin = { ...APT, id: 'a3', status: 'cancelled', cancellationType: 'admin', rescheduledToId: null, cancelledAt: new Date('2026-06-02T12:00:00Z') }
+    prismaMock.appointment.findMany
+      .mockResolvedValueOnce([rescheduled, byAdmin])
+      .mockResolvedValueOnce([{ id: 'a2', startDateTime: new Date('2026-06-10T19:00:00Z'), status: 'pending' }])
+
+    const res = await request(app).get('/api/admin/appointments/cancelled?year=2026&month=6').set('Cookie', `auth_token=${token()}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.data[0].rescheduledTo).toEqual({ id: 'a2', startDateTime: '2026-06-10T19:00:00.000Z', status: 'pending' })
+    expect(res.body.data[1].rescheduledTo).toBeNull()
+    expect(prismaMock.appointment.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: { id: { in: ['a2'] }, professionalId: 'pro1' },
+    }))
   })
 })
 

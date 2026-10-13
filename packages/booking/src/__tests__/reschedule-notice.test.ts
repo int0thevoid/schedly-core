@@ -124,7 +124,10 @@ describe('reagendar desde el panel (US-090)', () => {
       paymentAmount: 35000,
       paymentMethod: 'transfer',
     })
-    expect(prismaMock.appointment.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'apt1' }, data: { status: 'cancelled' } }))
+    expect(prismaMock.appointment.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'apt1' },
+      data: { status: 'cancelled', cancelledAt: expect.any(Date), cancellationType: 'rescheduled', rescheduledToId: 'apt2' },
+    }))
   })
 
   it('el chequeo de horario ocupado no choca con la propia cita', async () => {

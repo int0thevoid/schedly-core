@@ -120,6 +120,12 @@ model Appointment {
   paymentDeadline  DateTime?
   autoCancelledAt  DateTime?
 
+  // Registro de citas canceladas (US-088): cuándo, quién (patient | admin | rescheduled) y, si se
+  // reagendó, el id de la cita nueva.
+  cancelledAt      DateTime?
+  cancellationType String?
+  rescheduledToId  String?
+
   outcome String?
 
   attended Boolean?
