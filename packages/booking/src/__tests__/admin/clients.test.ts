@@ -277,3 +277,66 @@ describe('GET /api/admin/clients/:id/stats', () => {
     expect(res.body.data.servicesUsed).toHaveLength(2)
   })
 })
+
+describe('POST /api/admin/clients — ficha desde cita manual (US-083)', () => {
+  beforeEach(() => resetMocks())
+
+  const BODY = { name: 'Ana Pérez', email: 'Ana@Test.cl', phone: '+56912345678', rut: '12.345.678-9' }
+
+  it('requiere sesión de administradora', async () => {
+    const res = await request(app).post('/api/admin/clients').send(BODY)
+    expect(res.status).toBe(401)
+  })
+
+  it('valida nombre y correo', async () => {
+    const res = await request(app).post('/api/admin/clients').set('Cookie', `auth_token=${token()}`).send({ name: '', email: 'x' })
+    expect(res.status).toBe(400)
+  })
+
+  it('crea la ficha de un paciente nuevo sin consentimiento', async () => {
+    prismaMock.client.findFirst.mockResolvedValue(null)
+    prismaMock.client.create.mockResolvedValue({ id: 'c1', ...BODY, dataConsentGiven: false })
+    const res = await request(app).post('/api/admin/clients').set('Cookie', `auth_token=${token()}`).send(BODY)
+    expect(res.status).toBe(201)
+    expect(prismaMock.client.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { email: { equals: 'Ana@Test.cl', mode: 'insensitive' } } }),
+    )
+    expect(prismaMock.client.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: { email: 'Ana@Test.cl', name: 'Ana Pérez', phone: '+56912345678', rut: '12.345.678-9', dataConsentGiven: false },
+    }))
+  })
+
+  it('actualiza la ficha existente (sin distinguir mayúsculas) sin tocar el consentimiento', async () => {
+    prismaMock.client.findFirst.mockResolvedValue({ id: 'c1' })
+    prismaMock.client.update.mockResolvedValue({ id: 'c1', ...BODY, dataConsentGiven: true })
+    const res = await request(app).post('/api/admin/clients').set('Cookie', `auth_token=${token()}`).send(BODY)
+    expect(res.status).toBe(200)
+    const data = prismaMock.client.update.mock.calls[0][0].data
+    expect(data).toEqual({ name: 'Ana Pérez', phone: '+56912345678', rut: '12.345.678-9' })
+    expect(data).not.toHaveProperty('dataConsentGiven')
+    expect(prismaMock.client.create).not.toHaveBeenCalled()
+  })
+
+  it('no borra teléfono ni RUT existentes si la cita manual no los trae', async () => {
+    prismaMock.client.findFirst.mockResolvedValue({ id: 'c1' })
+    prismaMock.client.update.mockResolvedValue({ id: 'c1' })
+    await request(app).post('/api/admin/clients').set('Cookie', `auth_token=${token()}`).send({ name: 'Ana', email: 'ana@test.cl' })
+    expect(prismaMock.client.update.mock.calls[0][0].data).toEqual({ name: 'Ana' })
+  })
+})
+
+describe('GET /api/admin/clients — límite solo para búsquedas (US-083)', () => {
+  beforeEach(() => resetMocks())
+
+  it('la lista completa trae todos los pacientes', async () => {
+    prismaMock.client.findMany.mockResolvedValue([])
+    await request(app).get('/api/admin/clients').set('Cookie', `auth_token=${token()}`)
+    expect(prismaMock.client.findMany.mock.calls[0][0]).not.toHaveProperty('take')
+  })
+
+  it('la búsqueda devuelve como máximo 20', async () => {
+    prismaMock.client.findMany.mockResolvedValue([])
+    await request(app).get('/api/admin/clients?q=ana&field=name').set('Cookie', `auth_token=${token()}`)
+    expect(prismaMock.client.findMany.mock.calls[0][0]).toMatchObject({ take: 20 })
+  })
+})

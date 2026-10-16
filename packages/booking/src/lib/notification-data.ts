@@ -230,8 +230,10 @@ export function buildProfessionalRescheduleNoticeData(
   originalAppointment: AppointmentWithService,
   newAppointment: AppointmentWithService,
   professional: Professional,
+  rescheduledBy: 'patient' | 'admin' = 'patient',
 ): ProfessionalRescheduleNoticeData {
   return {
+    rescheduledBy,
     clientName: newAppointment.clientName,
     clientEmail: newAppointment.clientEmail,
     clientPhone: newAppointment.clientPhone,

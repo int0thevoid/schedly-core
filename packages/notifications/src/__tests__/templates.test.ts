@@ -577,6 +577,12 @@ describe('professionalRescheduleNoticeTemplate', () => {
     expect(html).toContain('https://admin.example.com/admin/agenda')
   })
 
+  it('indica cuando el reagendamiento se hizo desde el panel', () => {
+    expect(professionalRescheduleNoticeTemplate(baseData).html).toContain('reagendó su cita')
+    const { html } = professionalRescheduleNoticeTemplate({ ...baseData, rescheduledBy: 'admin' })
+    expect(html).toContain('Reagendaste desde el panel la cita de <strong>Ana Pérez</strong>')
+  })
+
   it('escapa el HTML de los datos de la paciente', () => {
     const { html } = professionalRescheduleNoticeTemplate({ ...baseData, clientName: '<script>x</script>' })
     expect(html).not.toContain('<script>x</script>')
