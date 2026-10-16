@@ -21,7 +21,10 @@ export { generateGoogleCalendarUrl } from './utils/google-calendar.js'
 export { generateICSFile, type ICSParams } from './utils/ics-generator.js'
 export {
   createGoogleMeetEvent,
+  tryCreateGoogleMeetEvent,
   cancelGoogleMeetEvent,
+  type GoogleMeetAttempt,
+  type GoogleMeetFailureReason,
   type GoogleMeetEventInput,
   type GoogleMeetEventResult,
 } from './utils/google-meet.js'

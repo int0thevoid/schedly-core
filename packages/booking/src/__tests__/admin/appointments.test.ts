@@ -8,12 +8,14 @@ const TZ = 'America/Santiago'
 vi.mock('../../lib/prisma.js', () => ({ prisma: prismaMock }))
 
 const sendAppointmentConfirmationMock = vi.fn()
+const tryCreateGoogleMeetEventMock = vi.fn()
 const sendAppointmentCancelledByPatientMock = vi.fn()
 
 vi.mock('@schedly/notifications', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@schedly/notifications')>()
   return {
     ...actual,
+    tryCreateGoogleMeetEvent: (...args: unknown[]) => tryCreateGoogleMeetEventMock(...args),
     EmailService: class {
       sendAppointmentConfirmation = sendAppointmentConfirmationMock
       sendAppointmentCancelledByPatient = sendAppointmentCancelledByPatientMock
@@ -48,6 +50,8 @@ const PROFESSIONAL = {
 beforeEach(() => {
   resetMocks()
   sendAppointmentConfirmationMock.mockReset()
+  tryCreateGoogleMeetEventMock.mockReset()
+  tryCreateGoogleMeetEventMock.mockResolvedValue({ ok: false, reason: 'not_configured', detail: '' })
   sendAppointmentCancelledByPatientMock.mockReset()
   process.env.PROFESSIONAL_ID = 'pro1'
 })
@@ -513,6 +517,72 @@ describe('PATCH /api/admin/appointments/:id/notify-confirmation', () => {
       .send({})
 
     expect(res.status).toBe(502)
+  })
+})
+
+describe('notify-confirmation with an online appointment without Meet link', () => {
+  it('creates the link first so the re-sent email includes it', async () => {
+    prismaMock.appointment.findFirst.mockResolvedValue({ ...APT, meetLink: null })
+    prismaMock.service.findUnique.mockResolvedValue(APT.service)
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    tryCreateGoogleMeetEventMock.mockResolvedValue({ ok: true, eventId: 'evt1', meetLink: 'https://meet.google.com/abc' })
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, googleEventId: 'evt1', meetLink: 'https://meet.google.com/abc' })
+    sendAppointmentConfirmationMock.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .patch('/api/admin/appointments/a1/notify-confirmation')
+      .set('Cookie', `auth_token=${token()}`)
+      .send({})
+
+    expect(res.status).toBe(200)
+    expect(sendAppointmentConfirmationMock).toHaveBeenCalledWith(
+      APT.clientEmail,
+      expect.objectContaining({ meetLink: 'https://meet.google.com/abc' }),
+    )
+  })
+})
+
+describe('POST /api/admin/appointments/:id/meet', () => {
+  it('returns the existing link without calling Google', async () => {
+    prismaMock.appointment.findFirst.mockResolvedValue({ ...APT, meetLink: 'https://meet.google.com/xyz' })
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+
+    const res = await request(app).post('/api/admin/appointments/a1/meet').set('Cookie', `auth_token=${token()}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.data).toEqual({ meetLink: 'https://meet.google.com/xyz' })
+    expect(tryCreateGoogleMeetEventMock).not.toHaveBeenCalled()
+  })
+
+  it('creates and saves the link when missing', async () => {
+    prismaMock.appointment.findFirst.mockResolvedValue({ ...APT, meetLink: null })
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    tryCreateGoogleMeetEventMock.mockResolvedValue({ ok: true, eventId: 'evt1', meetLink: 'https://meet.google.com/new' })
+    prismaMock.appointment.update.mockResolvedValue({ ...APT, meetLink: 'https://meet.google.com/new' })
+
+    const res = await request(app).post('/api/admin/appointments/a1/meet').set('Cookie', `auth_token=${token()}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.data).toEqual({ meetLink: 'https://meet.google.com/new' })
+  })
+
+  it('returns 502 with the cause when Google rejects the authorization', async () => {
+    prismaMock.appointment.findFirst.mockResolvedValue({ ...APT, meetLink: null })
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    tryCreateGoogleMeetEventMock.mockResolvedValue({ ok: false, reason: 'auth', detail: 'invalid_grant' })
+
+    const res = await request(app).post('/api/admin/appointments/a1/meet').set('Cookie', `auth_token=${token()}`)
+
+    expect(res.status).toBe(502)
+    expect(res.body.error).toMatch(/volver a conectar Google Calendar/)
+  })
+
+  it('rejects presential appointments', async () => {
+    prismaMock.appointment.findFirst.mockResolvedValue({ ...APT, modality: 'presential' })
+
+    const res = await request(app).post('/api/admin/appointments/a1/meet').set('Cookie', `auth_token=${token()}`)
+
+    expect(res.status).toBe(400)
   })
 })
 

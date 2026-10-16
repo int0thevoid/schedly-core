@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createGoogleMeetEvent, cancelGoogleMeetEvent } from '../utils/google-meet.js'
+import { createGoogleMeetEvent, cancelGoogleMeetEvent, tryCreateGoogleMeetEvent } from '../utils/google-meet.js'
 
 const START = new Date('2026-07-15T10:00:00.000Z')
 const END = new Date('2026-07-15T10:45:00.000Z')
@@ -141,5 +141,45 @@ describe('cancelGoogleMeetEvent', () => {
       .mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'server error' })
 
     await expect(cancelGoogleMeetEvent('evt_1')).resolves.toBeUndefined()
+  })
+})
+
+describe('tryCreateGoogleMeetEvent', () => {
+  const INPUT = { title: 'Psicoterapia', description: 'Sesión online', startDateTime: START, endDateTime: END }
+
+  beforeEach(() => {
+    clearCredentials()
+    vi.stubGlobal('fetch', vi.fn())
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    clearCredentials()
+  })
+
+  it('reports not_configured when the GOOGLE_* variables are missing', async () => {
+    expect(await tryCreateGoogleMeetEvent(INPUT)).toMatchObject({ ok: false, reason: 'not_configured' })
+  })
+
+  it('reports auth when Google rejects the refresh token', async () => {
+    setCredentials()
+    ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      text: async () => '{"error":"invalid_grant"}',
+    })
+    const result = await tryCreateGoogleMeetEvent(INPUT)
+    expect(result).toMatchObject({ ok: false, reason: 'auth' })
+    expect(result.ok ? '' : result.detail).toContain('invalid_grant')
+  })
+
+  it('reports api when the Calendar API fails', async () => {
+    setCredentials()
+    ;(fetch as unknown as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 't' }) })
+      .mockResolvedValueOnce({ ok: false, status: 403, text: async () => 'forbidden' })
+    expect(await tryCreateGoogleMeetEvent(INPUT)).toMatchObject({ ok: false, reason: 'api' })
   })
 })
