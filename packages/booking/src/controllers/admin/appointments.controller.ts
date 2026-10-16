@@ -376,7 +376,8 @@ const MEET_FAILURE_MESSAGES: Record<string, string> = {
 
 /**
  * Devuelve el link de Meet de una cita online y, si no lo tiene, intenta crearlo. Si Google
- * falla, responde 502 con la causa para que el panel se la muestre a la profesional.
+ * falla, responde 424 con la causa para que el panel se la muestre a la profesional (no 502:
+ * Cloudflare reemplaza los 502 del origen por su propia página y el mensaje se pierde).
  */
 export async function ensureAppointmentMeetLink(req: Request, res: Response): Promise<void> {
   const appointment = await prisma.appointment.findFirst({
@@ -399,7 +400,7 @@ export async function ensureAppointmentMeetLink(req: Request, res: Response): Pr
   const { service, ...base } = appointment
   const result = await ensureGoogleMeetEventDetailed(base, service, professional?.name ?? '')
   if (result.failure) {
-    fail(res, MEET_FAILURE_MESSAGES[result.failure.reason] ?? MEET_FAILURE_MESSAGES.api, 502)
+    fail(res, MEET_FAILURE_MESSAGES[result.failure.reason] ?? MEET_FAILURE_MESSAGES.api, 424)
     return
   }
   ok(res, { meetLink: result.appointment.meetLink })

@@ -566,14 +566,14 @@ describe('POST /api/admin/appointments/:id/meet', () => {
     expect(res.body.data).toEqual({ meetLink: 'https://meet.google.com/new' })
   })
 
-  it('returns 502 with the cause when Google rejects the authorization', async () => {
+  it('returns 424 with the cause when Google rejects the authorization', async () => {
     prismaMock.appointment.findFirst.mockResolvedValue({ ...APT, meetLink: null })
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     tryCreateGoogleMeetEventMock.mockResolvedValue({ ok: false, reason: 'auth', detail: 'invalid_grant' })
 
     const res = await request(app).post('/api/admin/appointments/a1/meet').set('Cookie', `auth_token=${token()}`)
 
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(424)
     expect(res.body.error).toMatch(/volver a conectar Google Calendar/)
   })
 
