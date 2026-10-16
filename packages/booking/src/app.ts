@@ -80,6 +80,12 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, error: 'Too many login attempts, please try again later' },
 })
+// The API host has no page of its own: Google found its root (404) through the photo URL and
+// reported it in Search Console. Send visitors and crawlers to the site instead.
+app.get('/', (_req: Request, res: Response) => {
+  res.redirect(301, process.env.FRONTEND_URL ?? 'http://localhost:5173')
+})
+
 app.use('/api', apiLimiter)
 app.use('/api/auth/login', loginLimiter)
 
