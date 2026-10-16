@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../lib/prisma.js', () => ({ prisma: prismaMock }))
 vi.mock('@schedly/notifications', () => ({
-  createGoogleMeetEvent: vi.fn(),
+  tryCreateGoogleMeetEvent: vi.fn(),
   cancelGoogleMeetEvent: vi.fn(),
 }))
 
 import { prismaMock, resetMocks } from './helpers/prisma-mock.js'
-import { createGoogleMeetEvent, cancelGoogleMeetEvent } from '@schedly/notifications'
-import { ensureGoogleMeetEvent, cancelGoogleMeetEventForAppointment } from '../lib/google-meet.js'
+import { tryCreateGoogleMeetEvent, cancelGoogleMeetEvent } from '@schedly/notifications'
+import { ensureGoogleMeetEvent, ensureGoogleMeetEventDetailed, cancelGoogleMeetEventForAppointment } from '../lib/google-meet.js'
 
 const SERVICE = {
   id: 's1', name: 'Terapia individual', professionalId: 'pro1', isActive: true,
@@ -34,7 +34,7 @@ const PRESENTIAL_APPOINTMENT = { ...ONLINE_APPOINTMENT, id: 'apt2', modality: 'p
 
 beforeEach(() => {
   resetMocks()
-  vi.mocked(createGoogleMeetEvent).mockReset()
+  vi.mocked(tryCreateGoogleMeetEvent).mockReset()
   vi.mocked(cancelGoogleMeetEvent).mockReset()
 })
 
@@ -42,17 +42,17 @@ describe('ensureGoogleMeetEvent', () => {
   it('does nothing for presential appointments', async () => {
     const result = await ensureGoogleMeetEvent(PRESENTIAL_APPOINTMENT, SERVICE, 'Stefany Osorio')
     expect(result).toBe(PRESENTIAL_APPOINTMENT)
-    expect(createGoogleMeetEvent).not.toHaveBeenCalled()
+    expect(tryCreateGoogleMeetEvent).not.toHaveBeenCalled()
   })
 
   it('creates the Meet event and persists the link for online appointments', async () => {
-    vi.mocked(createGoogleMeetEvent).mockResolvedValue({ eventId: 'evt1', meetLink: 'https://meet.google.com/abc-defg-hij' })
+    vi.mocked(tryCreateGoogleMeetEvent).mockResolvedValue({ ok: true, eventId: 'evt1', meetLink: 'https://meet.google.com/abc-defg-hij' })
     const updated = { ...ONLINE_APPOINTMENT, googleEventId: 'evt1', meetLink: 'https://meet.google.com/abc-defg-hij' }
     prismaMock.appointment.update.mockResolvedValue(updated)
 
     const result = await ensureGoogleMeetEvent(ONLINE_APPOINTMENT, SERVICE, 'Stefany Osorio')
 
-    expect(createGoogleMeetEvent).toHaveBeenCalledWith(
+    expect(tryCreateGoogleMeetEvent).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Terapia individual — Stefany Osorio', attendeeEmail: 'ana@test.com' }),
     )
     expect(prismaMock.appointment.update).toHaveBeenCalledWith({
@@ -63,7 +63,7 @@ describe('ensureGoogleMeetEvent', () => {
   })
 
   it('returns the original appointment when Meet creation fails, without throwing', async () => {
-    vi.mocked(createGoogleMeetEvent).mockResolvedValue(null)
+    vi.mocked(tryCreateGoogleMeetEvent).mockResolvedValue({ ok: false, reason: 'auth', detail: 'invalid_grant' })
 
     const result = await ensureGoogleMeetEvent(ONLINE_APPOINTMENT, SERVICE, 'Stefany Osorio')
 
@@ -72,11 +72,26 @@ describe('ensureGoogleMeetEvent', () => {
   })
 
   it('does not throw when the Meet service itself rejects', async () => {
-    vi.mocked(createGoogleMeetEvent).mockRejectedValue(new Error('network error'))
+    vi.mocked(tryCreateGoogleMeetEvent).mockRejectedValue(new Error('network error'))
 
     const result = await ensureGoogleMeetEvent(ONLINE_APPOINTMENT, SERVICE, 'Stefany Osorio')
 
     expect(result).toBe(ONLINE_APPOINTMENT)
+  })
+})
+
+describe('ensureGoogleMeetEventDetailed', () => {
+  it('does not call Google when the appointment already has a link', async () => {
+    const withLink = { ...ONLINE_APPOINTMENT, meetLink: 'https://meet.google.com/xyz' }
+    const result = await ensureGoogleMeetEventDetailed(withLink, SERVICE, 'Stefany Osorio')
+    expect(result).toEqual({ appointment: withLink })
+    expect(tryCreateGoogleMeetEvent).not.toHaveBeenCalled()
+  })
+
+  it('reports why the link could not be created', async () => {
+    vi.mocked(tryCreateGoogleMeetEvent).mockResolvedValue({ ok: false, reason: 'auth', detail: 'invalid_grant' })
+    const result = await ensureGoogleMeetEventDetailed(ONLINE_APPOINTMENT, SERVICE, 'Stefany Osorio')
+    expect(result.failure).toEqual({ reason: 'auth', detail: 'invalid_grant' })
   })
 })
 

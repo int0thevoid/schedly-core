@@ -73,19 +73,35 @@ function extractMeetLink(event: GoogleCalendarEventResponse): string | undefined
 }
 
 /**
- * Crea un evento en Google Calendar con videollamada de Google Meet para una cita online.
- * No lanza: si las credenciales no están configuradas o falla la llamada a la API,
- * devuelve `null` — el llamador debe seguir confirmando la cita sin bloquear al paciente.
+ * Por qué no se pudo crear el Meet: `not_configured` (faltan variables GOOGLE_*), `auth` (Google
+ * rechazó el refresh token: hay que volver a autorizar el calendario) o `api` (otro error).
  */
-export async function createGoogleMeetEvent(input: GoogleMeetEventInput): Promise<GoogleMeetEventResult | null> {
+export type GoogleMeetFailureReason = 'not_configured' | 'auth' | 'api'
+
+export type GoogleMeetAttempt =
+  | ({ ok: true } & GoogleMeetEventResult)
+  | { ok: false; reason: GoogleMeetFailureReason; detail: string }
+
+class GoogleAuthError extends Error {}
+
+/**
+ * Igual que `createGoogleMeetEvent`, pero informa la causa del fallo. La usa el panel para
+ * mostrarle a la profesional por qué una cita online quedó sin link.
+ */
+export async function tryCreateGoogleMeetEvent(input: GoogleMeetEventInput): Promise<GoogleMeetAttempt> {
   const creds = getCredentialsFromEnv()
   if (!creds) {
     console.warn('[google-meet] Google OAuth credentials not configured — skipping Meet event creation')
-    return null
+    return { ok: false, reason: 'not_configured', detail: 'Google OAuth credentials not configured' }
   }
 
   try {
-    const accessToken = await getAccessToken(creds)
+    let accessToken: string
+    try {
+      accessToken = await getAccessToken(creds)
+    } catch (err) {
+      throw new GoogleAuthError(err instanceof Error ? err.message : String(err))
+    }
     const res = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(creds.calendarId)}/events?conferenceDataVersion=1`,
       {
@@ -119,11 +135,22 @@ export async function createGoogleMeetEvent(input: GoogleMeetEventInput): Promis
     if (!event.id || !meetLink) {
       throw new Error('Google Calendar API response missing event id or Meet link')
     }
-    return { eventId: event.id, meetLink }
+    return { ok: true, eventId: event.id, meetLink }
   } catch (err) {
     console.error('[google-meet] failed to create Google Meet event', err)
-    return null
+    const detail = err instanceof Error ? err.message : String(err)
+    return { ok: false, reason: err instanceof GoogleAuthError ? 'auth' : 'api', detail }
   }
+}
+
+/**
+ * Crea un evento en Google Calendar con videollamada de Google Meet para una cita online.
+ * No lanza: si las credenciales no están configuradas o falla la llamada a la API,
+ * devuelve `null` — el llamador debe seguir confirmando la cita sin bloquear al paciente.
+ */
+export async function createGoogleMeetEvent(input: GoogleMeetEventInput): Promise<GoogleMeetEventResult | null> {
+  const attempt = await tryCreateGoogleMeetEvent(input)
+  return attempt.ok ? { eventId: attempt.eventId, meetLink: attempt.meetLink } : null
 }
 
 /**

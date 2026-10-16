@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
 import { getEmailService } from '../../lib/email-service.js'
-import { cancelGoogleMeetEventForAppointment } from '../../lib/google-meet.js'
+import { cancelGoogleMeetEventForAppointment, ensureGoogleMeetEvent, ensureGoogleMeetEventDetailed } from '../../lib/google-meet.js'
 import {
   buildAppointmentCancelledByPatientData,
   buildAppointmentConfirmationData,
@@ -353,7 +353,10 @@ export async function notifyAppointmentConfirmation(req: Request, res: Response)
     return
   }
 
-  const data = buildAppointmentConfirmationData({ ...appointment, service }, professional)
+  // An online appointment may have been left without a link (Google failed at booking time):
+  // retry so the re-sent confirmation carries it
+  const withMeet = await ensureGoogleMeetEvent(appointment, service, professional.name)
+  const data = buildAppointmentConfirmationData({ ...withMeet, service }, professional)
   try {
     await getEmailService().sendAppointmentConfirmation(appointment.clientEmail, data)
   } catch (err) {
@@ -364,6 +367,44 @@ export async function notifyAppointmentConfirmation(req: Request, res: Response)
   ok(res, { sent: true })
 }
 
+const MEET_FAILURE_MESSAGES: Record<string, string> = {
+  not_configured: 'Google Calendar no está configurado en el servidor.',
+  auth: 'Google rechazó la autorización del calendario: hay que volver a conectar Google Calendar.',
+  api: 'Google Calendar no pudo crear la videollamada. Intenta de nuevo en unos minutos.',
+  db: 'Se creó la videollamada pero no se pudo guardar. Intenta de nuevo.',
+}
+
+/**
+ * Devuelve el link de Meet de una cita online y, si no lo tiene, intenta crearlo. Si Google
+ * falla, responde 424 con la causa para que el panel se la muestre a la profesional (no 502:
+ * Cloudflare reemplaza los 502 del origen por su propia página y el mensaje se pierde).
+ */
+export async function ensureAppointmentMeetLink(req: Request, res: Response): Promise<void> {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: String(req.params.id), professionalId: req.professionalId ?? '' },
+    include: { service: true },
+  })
+  if (!appointment) {
+    fail(res, 'Appointment not found', 404)
+    return
+  }
+  if (appointment.modality !== 'online') {
+    fail(res, 'La cita no es online', 400)
+    return
+  }
+  if (appointment.status === 'cancelled') {
+    fail(res, 'La cita está cancelada', 409)
+    return
+  }
+  const professional = await prisma.professional.findUnique({ where: { id: appointment.professionalId } })
+  const { service, ...base } = appointment
+  const result = await ensureGoogleMeetEventDetailed(base, service, professional?.name ?? '')
+  if (result.failure) {
+    fail(res, MEET_FAILURE_MESSAGES[result.failure.reason] ?? MEET_FAILURE_MESSAGES.api, 424)
+    return
+  }
+  ok(res, { meetLink: result.appointment.meetLink })
+}
 
 /**
  * Reagenda una cita desde el panel (US-090): crea la nueva y cancela la original en una sola

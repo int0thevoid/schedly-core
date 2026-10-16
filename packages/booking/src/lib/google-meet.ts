@@ -1,6 +1,50 @@
-import { createGoogleMeetEvent, cancelGoogleMeetEvent } from '@schedly/notifications'
+import { tryCreateGoogleMeetEvent, cancelGoogleMeetEvent, type GoogleMeetAttempt, type GoogleMeetFailureReason } from '@schedly/notifications'
 import { prisma } from './prisma.js'
 import type { Appointment, Service } from '../generated/prisma/index.js'
+
+type MeetEnsureResult =
+  | { appointment: Appointment; failure?: undefined }
+  | { appointment: Appointment; failure: { reason: GoogleMeetFailureReason | 'db'; detail: string } }
+
+/**
+ * Como `ensureGoogleMeetEvent`, pero informa por qué no se pudo crear el link (lo usa el panel).
+ * Si la cita ya tiene link, o no es online, no hace nada.
+ */
+export async function ensureGoogleMeetEventDetailed(
+  appointment: Appointment,
+  service: Service,
+  professionalName: string,
+): Promise<MeetEnsureResult> {
+  if (appointment.modality !== 'online' || appointment.meetLink) return { appointment }
+
+  let attempt: GoogleMeetAttempt
+  try {
+    attempt = await tryCreateGoogleMeetEvent({
+      title: `${service.name} — ${professionalName}`,
+      description: `Sesión de psicología con ${professionalName}`,
+      startDateTime: appointment.startDateTime,
+      endDateTime: appointment.endDateTime,
+      attendeeEmail: appointment.clientEmail,
+    })
+  } catch (err) {
+    attempt = { ok: false, reason: 'api', detail: err instanceof Error ? err.message : String(err) }
+  }
+  if (!attempt.ok) {
+    console.error(`[google-meet] appointment ${appointment.id} left without Meet link (${attempt.reason}): ${attempt.detail}`)
+    return { appointment, failure: { reason: attempt.reason, detail: attempt.detail } }
+  }
+
+  try {
+    const updated = await prisma.appointment.update({
+      where: { id: appointment.id },
+      data: { googleEventId: attempt.eventId, meetLink: attempt.meetLink },
+    })
+    return { appointment: updated }
+  } catch (err) {
+    console.error(`[google-meet] failed to save Meet link for appointment ${appointment.id}`, err)
+    return { appointment, failure: { reason: 'db', detail: err instanceof Error ? err.message : String(err) } }
+  }
+}
 
 /**
  * Crea el evento de Google Meet para una cita online y persiste `googleEventId`/`meetLink`.
@@ -12,26 +56,7 @@ export async function ensureGoogleMeetEvent(
   service: Service,
   professionalName: string,
 ): Promise<Appointment> {
-  if (appointment.modality !== 'online') return appointment
-
-  try {
-    const result = await createGoogleMeetEvent({
-      title: `${service.name} — ${professionalName}`,
-      description: `Sesión de psicología con ${professionalName}`,
-      startDateTime: appointment.startDateTime,
-      endDateTime: appointment.endDateTime,
-      attendeeEmail: appointment.clientEmail,
-    })
-    if (!result) return appointment
-
-    return await prisma.appointment.update({
-      where: { id: appointment.id },
-      data: { googleEventId: result.eventId, meetLink: result.meetLink },
-    })
-  } catch (err) {
-    console.error(`[google-meet] failed to ensure Meet event for appointment ${appointment.id}`, err)
-    return appointment
-  }
+  return (await ensureGoogleMeetEventDetailed(appointment, service, professionalName)).appointment
 }
 
 /** Cancela el evento de Google Calendar asociado a una cita, si existe. No lanza. */
