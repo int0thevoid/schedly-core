@@ -47,6 +47,16 @@ export const prismaMock = {
     create: vi.fn(),
     upsert: vi.fn(),
   },
+  review: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    createMany: vi.fn(),
+    update: vi.fn(),
+    aggregate: vi.fn(),
+    groupBy: vi.fn(),
+  },
   auditLog: {
     findMany: vi.fn(),
     create: vi.fn(),
