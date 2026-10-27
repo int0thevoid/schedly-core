@@ -22,10 +22,16 @@ export async function lookupClient(req: Request, res: Response): Promise<void> {
 
   const client = await prisma.client.findFirst({
     where,
-    select: { name: true, phone: true, dataConsentGiven: true },
+    select: { name: true, email: true, phone: true, dataConsentGiven: true },
   })
 
   // Solo se autocompletan datos de pacientes que dieron su consentimiento (US-083): existen fichas
   // creadas desde el panel sin consentimiento, y este endpoint es público.
-  ok(res, client?.dataConsentGiven ? client : null)
+  if (!client?.dataConsentGiven) {
+    ok(res, null)
+    return
+  }
+  // US-099: si se dio de baja de las encuestas, el check del formulario aparece desmarcado.
+  const optOut = await prisma.surveyOptOut.findUnique({ where: { email: client.email.toLowerCase() } })
+  ok(res, { name: client.name, phone: client.phone, dataConsentGiven: true, surveyOptOut: Boolean(optOut) })
 }

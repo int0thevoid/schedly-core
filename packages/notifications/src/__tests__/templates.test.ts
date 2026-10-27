@@ -507,20 +507,31 @@ describe('generateGoogleCalendarUrl', () => {
 
 describe('reviewRequestTemplate', () => {
   const baseData: ReviewRequestData = {
-    clientName: 'Ana Pérez',
+    clientName: 'Ana',
     serviceName: 'Primera visita',
     professionalName: 'Ps. Stefany Osorio',
+    sessionDate: 'martes 20 de octubre',
+    reviewUrl: 'https://psstefanyosorio.cl/resena/rev_abc',
+    unsubscribeUrl: 'https://psstefanyosorio.cl/encuestas/baja/rev_abc',
   }
 
-  it('returns a subject including the professional name', () => {
-    const { subject } = reviewRequestTemplate(baseData)
-    expect(subject).toBe('⭐ ¿Cómo fue tu sesión con Ps. Stefany Osorio?')
+  it('asks about the specific session', () => {
+    const { subject, html } = reviewRequestTemplate(baseData)
+    expect(subject).toBe('⭐ ¿Qué te pareció tu sesión del martes 20 de octubre?')
+    expect(html).toContain('Primera visita')
   })
 
-  it('includes a Google review button when googleReviewLink is present', () => {
+  it('links to the review form of this session and to unsubscribe', () => {
+    const { html } = reviewRequestTemplate(baseData)
+    expect(html).toContain(baseData.reviewUrl)
+    expect(html).toContain(baseData.unsubscribeUrl)
+    expect(html).toContain('Darme de baja')
+  })
+
+  it('adds a secondary Google link only when present', () => {
+    expect(reviewRequestTemplate(baseData).html).not.toContain('Google')
     const { html } = reviewRequestTemplate({ ...baseData, googleReviewLink: 'https://g.page/r/example/review' })
     expect(html).toContain('https://g.page/r/example/review')
-    expect(html).toContain('Dejar reseña en Google')
   })
 })
 
@@ -555,6 +566,20 @@ describe('dailyDigestTemplate', () => {
   it('shows "No tienes citas para mañana" when appointments is empty', () => {
     const { html } = dailyDigestTemplate({ ...baseData, appointments: [] })
     expect(html).toContain('No tienes citas para mañana')
+  })
+})
+
+describe('dailyDigestTemplate — sesiones sin marcar (US-100)', () => {
+  const base = { professionalName: 'Ps. Stefany', date: 'Miércoles, 28 de octubre de 2026', appointments: [], adminUrl: 'https://x/admin/agenda' }
+
+  it('lists past sessions without attendance marked', () => {
+    const { html } = dailyDigestTemplate({ ...base, unmarkedSessions: [{ date: 'lun 26 oct', time: '10:00', clientName: 'Ana Pérez' }] })
+    expect(html).toContain('Sesiones sin marcar asistencia (1)')
+    expect(html).toContain('Ana Pérez')
+  })
+
+  it('omits the section when everything is marked', () => {
+    expect(dailyDigestTemplate({ ...base, unmarkedSessions: [] }).html).not.toContain('sin marcar')
   })
 })
 

@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
+import { sendPostSessionSurveyIfEligible } from '../../lib/survey.js'
 import { getEmailService } from '../../lib/email-service.js'
 import { cancelGoogleMeetEventForAppointment, ensureGoogleMeetEvent, ensureGoogleMeetEventDetailed } from '../../lib/google-meet.js'
 import {
@@ -329,7 +330,10 @@ export async function updateAppointmentOutcome(req: Request, res: Response): Pro
     where: { id },
     data: { outcome: parsed.data.outcome },
   })
-  ok(res, updated)
+  // US-100: al marcar "Asistió" se envía la encuesta si corresponde (check al agendar, sin baja,
+  // máximo 1 vez al mes). El resultado le dice al panel si salió o por qué no.
+  const survey = parsed.data.outcome === 'attended' ? await sendPostSessionSurveyIfEligible(appointment.id) : null
+  ok(res, { ...updated, survey })
 }
 
 /** Reenvía el correo de confirmación de cita (incluye el botón "Confirmar asistencia"). */

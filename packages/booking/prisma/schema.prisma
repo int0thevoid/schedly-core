@@ -146,6 +146,11 @@ model Appointment {
   // (panel o correo post-sesión); no vence, pero solo sirve una vez.
   reviewToken String? @unique
 
+  // Encuesta post-sesión (US-099/100): la paciente la aceptó al agendar (check marcado por
+  // defecto) y cuándo se envió. Se envía cuando Stefany marca la sesión como "Asistió".
+  surveyOptIn  Boolean   @default(false)
+  surveySentAt DateTime?
+
   professional Professional @relation(fields: [professionalId], references: [id])
   service      Service      @relation(fields: [serviceId], references: [id])
 
@@ -219,6 +224,13 @@ model Review {
 
   @@unique([source, externalId])
   @@index([professionalId, status, reviewedAt])
+}
+
+// Pacientes que pidieron no recibir más encuestas (enlace del correo, US-100). Por email: no
+// depende de que exista una ficha de paciente.
+model SurveyOptOut {
+  email     String   @id
+  createdAt DateTime @default(now())
 }
 
 // Historial de cambios para auditoría: cada creación, modificación o eliminación de datos y eventos
