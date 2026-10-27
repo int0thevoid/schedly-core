@@ -40,7 +40,7 @@ describe('GET /api/cancellation-policy (public)', () => {
     const res = await request(app).get('/api/cancellation-policy')
     expect(res.status).toBe(200)
     expect(res.body.data.title).toBe('Política de cancelación')
-    expect(res.body.data.content).toContain('Puedes reagendar con mínimo 24 horas de anticipación')
+    expect(res.body.data.content).toContain('hasta las 23:00 del día anterior')
   })
 
   it('does not require authentication', async () => {
