@@ -9,6 +9,8 @@ import { displayNameMatches } from '../lib/review-name.js'
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+  // Filtro por estrellas (1–5). El promedio, el total y la distribución siempre son de todas.
+  rating: z.coerce.number().int().min(1).max(5).optional(),
 })
 
 const submitSchema = z
@@ -47,20 +49,27 @@ export async function listPublicReviews(req: Request, res: Response): Promise<vo
     return
   }
   const where = { professionalId: professionalId(), status: 'approved' }
-  const [items, stats] = await Promise.all([
+  const filtered = parsed.data.rating ? { ...where, rating: parsed.data.rating } : where
+  const [items, stats, byRating] = await Promise.all([
     prisma.review.findMany({
-      where,
+      where: filtered,
       select: PUBLIC_SELECT,
       orderBy: { reviewedAt: 'desc' },
       take: parsed.data.limit,
       skip: parsed.data.offset,
     }),
     prisma.review.aggregate({ where, _avg: { rating: true }, _count: { _all: true } }),
+    prisma.review.groupBy({ by: ['rating'], where, _count: { _all: true } }),
   ])
+  const distribution: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
+  for (const g of byRating) distribution[String(g.rating)] = g._count._all
   ok(res, {
     items: items.map((r) => ({ ...r, displayName: r.isAnonymous ? null : r.displayName })),
     count: stats._count._all,
     average: stats._avg.rating === null ? null : Math.round(stats._avg.rating * 10) / 10,
+    distribution,
+    // Total del filtro aplicado (para "Ver más").
+    filteredCount: parsed.data.rating ? distribution[String(parsed.data.rating)] : stats._count._all,
   })
 }
 

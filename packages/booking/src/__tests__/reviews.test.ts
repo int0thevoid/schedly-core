@@ -57,6 +57,7 @@ describe('GET /api/reviews', () => {
       { id: 'r1', rating: 5, comment: 'Excelente', isAnonymous: true, displayName: 'Oculto', source: 'web' },
     ])
     prismaMock.review.aggregate.mockResolvedValue({ _avg: { rating: 4.8734 }, _count: { _all: 79 } })
+    prismaMock.review.groupBy.mockResolvedValue([{ rating: 5, _count: { _all: 78 } }, { rating: 1, _count: { _all: 1 } }])
 
     const res = await request(app).get('/api/reviews')
 
@@ -65,6 +66,21 @@ describe('GET /api/reviews', () => {
     expect(res.body.data.average).toBe(4.9)
     expect(res.body.data.items[0].displayName).toBeNull()
     expect(prismaMock.review.findMany.mock.calls[0][0].where.status).toBe('approved')
+    expect(res.body.data.distribution).toEqual({ '1': 1, '2': 0, '3': 0, '4': 0, '5': 78 })
+    expect(res.body.data.filteredCount).toBe(79)
+  })
+
+  it('filters by stars without changing the overall stats', async () => {
+    prismaMock.review.findMany.mockResolvedValue([])
+    prismaMock.review.aggregate.mockResolvedValue({ _avg: { rating: 4.9 }, _count: { _all: 79 } })
+    prismaMock.review.groupBy.mockResolvedValue([{ rating: 5, _count: { _all: 78 } }, { rating: 1, _count: { _all: 1 } }])
+
+    const res = await request(app).get('/api/reviews?rating=1')
+
+    expect(prismaMock.review.findMany.mock.calls[0][0].where).toMatchObject({ status: 'approved', rating: 1 })
+    expect(prismaMock.review.aggregate.mock.calls[0][0].where.rating).toBeUndefined()
+    expect(res.body.data).toMatchObject({ count: 79, filteredCount: 1 })
+    expect((await request(app).get('/api/reviews?rating=6')).status).toBe(400)
   })
 })
 
@@ -166,9 +182,10 @@ describe('Admin reviews', () => {
     prismaMock.review.groupBy.mockResolvedValue([{ status: 'pending', _count: { _all: 1 } }, { status: 'approved', _count: { _all: 79 } }])
     prismaMock.appointment.findMany.mockResolvedValue([{ id: 'apt1', clientName: 'María Andrea González' }])
 
-    const res = await request(app).get('/api/admin/reviews?status=pending').set('Cookie', adminCookie())
+    const res = await request(app).get('/api/admin/reviews?status=pending&rating=2').set('Cookie', adminCookie())
 
     expect(res.status).toBe(200)
+    expect(prismaMock.review.findMany.mock.calls[0][0].where).toMatchObject({ status: 'pending', rating: 2 })
     expect(res.body.data.counts).toEqual({ pending: 1, approved: 79, rejected: 0 })
     expect(res.body.data.items[0].appointment.clientName).toBe('María Andrea González')
   })
