@@ -127,8 +127,15 @@ describe('appointmentConfirmationTemplate', () => {
     const { html } = appointmentConfirmationTemplate({ ...baseData, canModify: false })
     expect(html).not.toContain(baseData.modifyUrl)
     expect(html).not.toContain(baseData.cancelUrl)
-    expect(html).toContain('Como tu cita es para hoy')
+    expect(html).toContain('Ya pasó el plazo')
     expect(html).not.toContain('23:00 del día anterior')
+  })
+
+  it('shows the exact deadline for same-day bookings', () => {
+    const { html } = appointmentConfirmationTemplate({ ...baseData, modifyDeadline: 'las 12:00 (3 horas antes de tu sesión)' })
+    expect(html).toContain('las 12:00 (3 horas antes de tu sesión)')
+    expect(html).not.toContain('23:00 del día anterior')
+    expect(html).toContain(baseData.modifyUrl)
   })
 })
 
@@ -383,7 +390,7 @@ describe('appointmentModifiedTemplate', () => {
     const { html } = appointmentModifiedTemplate({ ...baseData, canModify: false })
     expect(html).not.toContain(baseData.modifyUrl)
     expect(html).not.toContain(baseData.cancelUrl)
-    expect(html).toContain('Como tu cita es para hoy')
+    expect(html).toContain('Ya pasó el plazo')
   })
 })
 

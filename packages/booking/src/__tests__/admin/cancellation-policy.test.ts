@@ -40,7 +40,7 @@ describe('GET /api/cancellation-policy (public)', () => {
     const res = await request(app).get('/api/cancellation-policy')
     expect(res.status).toBe(200)
     expect(res.body.data.title).toBe('Política de cancelación')
-    expect(res.body.data.content).toContain('hasta las 23:00 del día anterior')
+    expect(res.body.data.content).toContain('hasta las 23:00 del día anterior (si agendas para el mismo día, hasta 3 horas antes)')
   })
 
   it('does not require authentication', async () => {
