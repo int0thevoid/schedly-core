@@ -102,7 +102,7 @@ export async function updateReviewReply(req: Request, res: Response): Promise<vo
   ok(res, updated)
 }
 
-export function reviewUrl(token: string): string {
+function reviewUrl(token: string): string {
   const base = process.env.FRONTEND_URL ?? 'http://localhost:5173'
   return `${base}/resena/${token}`
 }
