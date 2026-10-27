@@ -15,6 +15,7 @@ import {
   type AppointmentWithService,
 } from '../lib/notification-data.js'
 import { getEmailService } from '../lib/email-service.js'
+import { dateKeyInTZ, dayRangeInTZ } from '../lib/date.js'
 import { ensureGoogleMeetEvent, cancelGoogleMeetEventForAppointment } from '../lib/google-meet.js'
 import type { Appointment, Service } from '../generated/prisma/index.js'
 
@@ -77,11 +78,16 @@ function generateToken(): string {
   return `tok_${randomUUID()}`
 }
 
-function calculateTokenExpiry(startDateTime: Date): Date {
-  const expires = new Date(startDateTime)
-  expires.setUTCDate(expires.getUTCDate() - 1)
-  expires.setUTCHours(23, 0, 0, 0)
-  return expires
+/** Plazo para modificar/anular por enlace: 23:00 (hora de la profesional) del día anterior a la
+ * cita. Antes se calculaba a las 23:00 UTC, que en Chile son las 19:00–20:00. */
+async function professionalTimezone(professionalId: string): Promise<string> {
+  const professional = await prisma.professional.findUnique({ where: { id: professionalId }, select: { timezone: true } })
+  return professional?.timezone ?? 'America/Santiago'
+}
+
+function calculateTokenExpiry(startDateTime: Date, timezone: string): Date {
+  const { gte: startOfSessionDay } = dayRangeInTZ(dateKeyInTZ(startDateTime, timezone), timezone)
+  return new Date(startOfSessionDay.getTime() - 60 * 60 * 1000)
 }
 
 export async function createAppointment(req: Request, res: Response): Promise<void> {
@@ -111,7 +117,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
 
   const isCash = paymentMethod === 'cash'
   const appointmentToken = generateToken()
-  const tokenExpiresAt = calculateTokenExpiry(start)
+  const tokenExpiresAt = calculateTokenExpiry(start, await professionalTimezone(professionalId))
 
   try {
     const appointment = await runSerializable(async (tx) => {
@@ -337,6 +343,7 @@ export async function rescheduleAppointment(
   const newStart = options.newStart
   const newEnd = new Date(newStart.getTime() + service.duration * 60_000)
 
+  const timezone = await professionalTimezone(originalAppointment.professionalId)
   const newAppointment = await runSerializable(async (tx) => {
     const conflict = await tx.appointment.findFirst({
       where: {
@@ -366,7 +373,7 @@ export async function rescheduleAppointment(
         paymentMethod: originalAppointment.paymentMethod,
         bookingFlow: 'advance',
         appointmentToken: generateToken(),
-        tokenExpiresAt: calculateTokenExpiry(newStart),
+        tokenExpiresAt: calculateTokenExpiry(newStart, timezone),
       },
       include: { service: true },
     })

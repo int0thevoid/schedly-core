@@ -16,6 +16,8 @@ export interface AppointmentModifiedData {
   professionalPhone: string
   modifyUrl: string
   cancelUrl: string
+  /** false si el plazo para modificar/anular por enlace ya venció (cita para el mismo día). */
+  canModify?: boolean
   googleCalendarUrl: string
   newStartDateTime: Date
   newEndDateTime: Date
@@ -45,6 +47,14 @@ function hasRealCalendarInvite(data: AppointmentModifiedData): boolean {
   return data.modality === 'online' && Boolean(data.meetLink)
 }
 
+/** Citas para el mismo día: el plazo (23:00 del día anterior) ya pasó, así que en vez de botones
+ * que llevan a "el plazo ha vencido" se indica escribir por WhatsApp. */
+function renderModifyNote(data: AppointmentModifiedData, okNote: string): string {
+  if (data.canModify !== false) return okNote
+  const contact = data.professionalPhone ? ` por WhatsApp al <strong>${escapeHtml(data.professionalPhone)}</strong>` : ''
+  return `<p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Como tu cita es para hoy, ya no se puede modificar ni anular desde la web. Si necesitas cambiarla, escríbeme${contact}.</p>`
+}
+
 export function appointmentModifiedTemplate(data: AppointmentModifiedData): EmailTemplate {
   const subject = `✏️ Tu cita ha sido modificada — ${data.newDate}`
 
@@ -71,12 +81,12 @@ export function appointmentModifiedTemplate(data: AppointmentModifiedData): Emai
 
     ${renderLocation(data)}
 
-    <p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Puedes modificar o anular tu nueva cita hasta las <strong>23:00 del día anterior</strong>.</p>
+    ${renderModifyNote(data, `<p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Puedes modificar o anular tu nueva cita hasta las <strong>23:00 del día anterior</strong>.</p>`)}
 
-    <div style="margin:0 0 12px;text-align:center;">
+    ${data.canModify === false ? '' : `<div style="margin:0 0 12px;text-align:center;">
       <a href="${escapeHtml(data.modifyUrl)}" style="display:inline-block;background-color:${COLORS.primary};color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;margin:4px;">✏️ Modificar cita</a>
       <a href="${escapeHtml(data.cancelUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.accent};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;margin:4px;border:1px solid ${COLORS.accent};">❌ Anular cita</a>
-    </div>
+    </div>`}
     ${hasRealCalendarInvite(data) ? '' : `<div style="text-align:center;">
       <a href="${escapeHtml(data.googleCalendarUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.primary};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;border:1px solid ${COLORS.primary};">📅 Agregar a Google Calendar</a>
     </div>`}
