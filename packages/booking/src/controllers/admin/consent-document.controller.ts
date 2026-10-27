@@ -35,7 +35,7 @@ const CANCELLATION_DEFAULTS: PolicyDefaults = {
   title: 'Política de cancelación',
   content:
     '<ul>' +
-    '<li>Puedes reagendar con mínimo 24 horas de anticipación</li>' +
+    '<li>Puedes modificar o anular tu cita desde el enlace del correo de confirmación hasta las 23:00 del día anterior</li>' +
     '<li>Las sesiones deben confirmarse el día anterior</li>' +
     '<li>Sesiones no canceladas a tiempo no son reembolsadas</li>' +
     '<li>En caso de atraso, tienes 15 minutos de tolerancia</li>' +

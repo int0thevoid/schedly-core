@@ -94,6 +94,12 @@ function getAppointmentColorInfo(appointment: {
     : { color: '#E76F51', colorLabel: 'Sin confirmar ni pagar' }
 }
 
+/** Una cita agendada para el mismo día nace con el enlace ya vencido (plazo: 23:00 del día
+ * anterior): el correo no debe ofrecer botones que llevan a "el plazo ha vencido". */
+function canModifyByLink(tokenExpiresAt: Date | null | undefined): boolean {
+  return Boolean(tokenExpiresAt) && (tokenExpiresAt as Date) > new Date()
+}
+
 export function buildAppointmentConfirmationData(
   appointment: AppointmentWithService,
   professional: Professional,
@@ -114,6 +120,7 @@ export function buildAppointmentConfirmationData(
     professionalPhone: professional.phone ?? '',
     modifyUrl: buildTokenUrl(token, 'modificar'),
     cancelUrl: buildTokenUrl(token, 'anular'),
+    canModify: canModifyByLink(appointment.tokenExpiresAt),
     googleCalendarUrl: buildGoogleCalendarUrl(appointment, professional),
     startDateTime: appointment.startDateTime,
     endDateTime: appointment.endDateTime,
@@ -190,6 +197,7 @@ export function buildAppointmentModifiedData(
     professionalPhone: professional.phone ?? '',
     modifyUrl: buildTokenUrl(newToken, 'modificar'),
     cancelUrl: buildTokenUrl(newToken, 'anular'),
+    canModify: canModifyByLink(newAppointment.tokenExpiresAt),
     googleCalendarUrl: buildGoogleCalendarUrl(newAppointment, professional),
     newStartDateTime: newAppointment.startDateTime,
     newEndDateTime: newAppointment.endDateTime,

@@ -445,8 +445,9 @@ describe('PATCH /api/appointments/token/:token/reschedule', () => {
 })
 
 describe('POST /api/appointments — token generation', () => {
-  it('stores appointmentToken and tokenExpiresAt at 23:00 the day before', async () => {
+  it('stores appointmentToken and tokenExpiresAt at 23:00 (Chile) the day before', async () => {
     prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.professional.findUnique.mockResolvedValue({ timezone: 'America/Santiago' })
     prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
     prismaMock.appointment.findFirst.mockResolvedValue(null)
     prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
@@ -455,13 +456,9 @@ describe('POST /api/appointments — token generation', () => {
 
     const createCall = prismaMock.appointment.create.mock.calls[0][0]
     expect(createCall.data.appointmentToken).toBeDefined()
-    const expires = createCall.data.tokenExpiresAt as Date
-    const start = new Date('2026-12-15T14:00:00Z')
-    const dayBefore = new Date(start)
-    dayBefore.setUTCDate(dayBefore.getUTCDate() - 1)
-    expect(expires.getUTCDate()).toBe(dayBefore.getUTCDate())
-    expect(expires.getUTCHours()).toBe(23)
-    expect(expires.getUTCMinutes()).toBe(0)
+    // Cita 15-12 11:00 en Chile (UTC-3 en verano) → plazo 14-12 23:00 en Chile = 15-12 02:00 UTC.
+    // Antes quedaba a las 23:00 UTC (20:00 en Chile), tres horas antes de lo que dicen los correos.
+    expect((createCall.data.tokenExpiresAt as Date).toISOString()).toBe('2026-12-15T02:00:00.000Z')
   })
 })
 

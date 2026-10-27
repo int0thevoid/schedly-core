@@ -14,6 +14,8 @@ export interface AppointmentConfirmationData {
   professionalPhone: string
   modifyUrl: string
   cancelUrl: string
+  /** false si el plazo para modificar/anular por enlace ya venció (cita para el mismo día). */
+  canModify?: boolean
   googleCalendarUrl: string
   startDateTime: Date
   endDateTime: Date
@@ -47,12 +49,21 @@ function hasRealCalendarInvite(data: AppointmentConfirmationData): boolean {
   return data.modality === 'online' && Boolean(data.meetLink)
 }
 
+/** Citas para el mismo día: el plazo (23:00 del día anterior) ya pasó, así que en vez de botones
+ * que llevan a "el plazo ha vencido" se indica escribir por WhatsApp. */
+function renderModifyNote(data: AppointmentConfirmationData, okNote: string): string {
+  if (data.canModify !== false) return okNote
+  const contact = data.professionalPhone ? ` por WhatsApp al <strong>${escapeHtml(data.professionalPhone)}</strong>` : ''
+  return `<p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Como tu cita es para hoy, ya no se puede modificar ni anular desde la web. Si necesitas cambiarla, escríbeme${contact}.</p>`
+}
+
 function renderActionButtons(data: AppointmentConfirmationData): string {
   const calendarButton = hasRealCalendarInvite(data)
     ? ''
     : `<div style="margin:12px 0 0;text-align:center;">
       <a href="${escapeHtml(data.googleCalendarUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.primary};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;border:1px solid ${COLORS.primary};">📅 Agregar a Google Calendar</a>
     </div>`
+  if (data.canModify === false) return calendarButton
   return `
     <div style="margin:28px 0 0;text-align:center;">
       <a href="${escapeHtml(data.modifyUrl)}" style="display:inline-block;background-color:${COLORS.primary};color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;margin:4px;">✏️ Modificar cita</a>
@@ -81,7 +92,7 @@ export function appointmentConfirmationTemplate(data: AppointmentConfirmationDat
     ${renderLocation(data)}
 
     <p style="margin:0 0 8px;font-size:14px;color:${COLORS.muted};">Procura llegar unos minutos antes de tu sesión.</p>
-    <p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Puedes modificar o anular tu cita hasta las <strong>23:00 del día anterior</strong> a tu sesión.</p>
+    ${renderModifyNote(data, `<p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Puedes modificar o anular tu cita hasta las <strong>23:00 del día anterior</strong> a tu sesión.</p>`)}
 
     ${renderActionButtons(data)}
   `

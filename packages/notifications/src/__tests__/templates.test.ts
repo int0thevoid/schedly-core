@@ -122,6 +122,14 @@ describe('appointmentConfirmationTemplate', () => {
     const { html } = appointmentConfirmationTemplate({ ...baseData, modality: 'online', address: undefined })
     expect(html).toContain('Agregar a Google Calendar')
   })
+
+  it('replaces modify/cancel buttons with a WhatsApp note when the link already expired (same-day booking)', () => {
+    const { html } = appointmentConfirmationTemplate({ ...baseData, canModify: false })
+    expect(html).not.toContain(baseData.modifyUrl)
+    expect(html).not.toContain(baseData.cancelUrl)
+    expect(html).toContain('Como tu cita es para hoy')
+    expect(html).not.toContain('23:00 del día anterior')
+  })
 })
 
 describe('appointmentReminderTemplate', () => {
@@ -369,6 +377,13 @@ describe('appointmentModifiedTemplate', () => {
       meetLink: 'https://meet.google.com/abc-defg-hij',
     })
     expect(html).not.toContain('Agregar a Google Calendar')
+  })
+
+  it('replaces modify/cancel buttons with a WhatsApp note when the link already expired (same-day booking)', () => {
+    const { html } = appointmentModifiedTemplate({ ...baseData, canModify: false })
+    expect(html).not.toContain(baseData.modifyUrl)
+    expect(html).not.toContain(baseData.cancelUrl)
+    expect(html).toContain('Como tu cita es para hoy')
   })
 })
 
