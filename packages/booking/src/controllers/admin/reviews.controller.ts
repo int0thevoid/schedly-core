@@ -10,6 +10,7 @@ import { newReviewToken } from '../../lib/survey.js'
 
 const listSchema = z.object({
   status: z.enum(['pending', 'approved', 'rejected']).optional(),
+  rating: z.coerce.number().int().min(1).max(5).optional(),
 })
 
 const statusSchema = z.object({
@@ -33,7 +34,11 @@ export async function listAdminReviews(req: Request, res: Response): Promise<voi
   const professionalId = req.professionalId ?? ''
   const [reviews, grouped] = await Promise.all([
     prisma.review.findMany({
-      where: { professionalId, ...(parsed.data.status ? { status: parsed.data.status } : {}) },
+      where: {
+        professionalId,
+        ...(parsed.data.status ? { status: parsed.data.status } : {}),
+        ...(parsed.data.rating ? { rating: parsed.data.rating } : {}),
+      },
       orderBy: { reviewedAt: 'desc' },
     }),
     prisma.review.groupBy({ by: ['status'], where: { professionalId }, _count: { _all: true } }),
