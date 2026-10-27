@@ -64,13 +64,14 @@ const rescheduleSchema = z.object({
   newStartDateTime: z.string().datetime({ offset: true }),
 })
 
-function isSameCalendarDay(a: Date, b: Date): boolean {
-  return (
-    a.getUTCFullYear() === b.getUTCFullYear() &&
-    a.getUTCMonth() === b.getUTCMonth() &&
-    a.getUTCDate() === b.getUTCDate()
-  )
+/** Mismo día calendario en la zona horaria de la profesional (antes se comparaba en UTC: una
+ * reserva hecha a las 22:00 de Chile para el día siguiente contaba como "mismo día"). */
+function isSameCalendarDay(a: Date, b: Date, timezone: string): boolean {
+  return dateKeyInTZ(a, timezone) === dateKeyInTZ(b, timezone)
 }
+
+/** Citas agendadas para el mismo día: se pueden modificar/anular hasta 3 horas antes. */
+const SAME_DAY_MODIFY_HOURS = 3
 
 function generateToken(): string {
   // Es la única credencial para cancelar/reagendar una cita sin login vía link
@@ -78,14 +79,17 @@ function generateToken(): string {
   return `tok_${randomUUID()}`
 }
 
-/** Plazo para modificar/anular por enlace: 23:00 (hora de la profesional) del día anterior a la
- * cita. Antes se calculaba a las 23:00 UTC, que en Chile son las 19:00–20:00. */
 async function professionalTimezone(professionalId: string): Promise<string> {
   const professional = await prisma.professional.findUnique({ where: { id: professionalId }, select: { timezone: true } })
   return professional?.timezone ?? 'America/Santiago'
 }
 
-function calculateTokenExpiry(startDateTime: Date, timezone: string): Date {
+/** Plazo para modificar/anular por enlace: 23:00 (hora de la profesional) del día anterior a la
+ * cita; si la cita es para el mismo día en que se agenda/reagenda, hasta 3 horas antes. */
+function calculateTokenExpiry(startDateTime: Date, timezone: string, now: Date = new Date()): Date {
+  if (isSameCalendarDay(startDateTime, now, timezone)) {
+    return new Date(startDateTime.getTime() - SAME_DAY_MODIFY_HOURS * 60 * 60 * 1000)
+  }
   const { gte: startOfSessionDay } = dayRangeInTZ(dateKeyInTZ(startDateTime, timezone), timezone)
   return new Date(startOfSessionDay.getTime() - 60 * 60 * 1000)
 }
@@ -110,14 +114,15 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
   const start = new Date(startDateTime)
   const end = new Date(start.getTime() + service.duration * 60_000)
   const now = new Date()
-  const bookingFlow = isSameCalendarDay(start, now) ? 'same_day' : 'advance'
+  const timezone = await professionalTimezone(professionalId)
+  const bookingFlow = isSameCalendarDay(start, now, timezone) ? 'same_day' : 'advance'
   const paymentDeadline = bookingFlow === 'same_day'
     ? end
     : new Date(now.getTime() + 24 * 60 * 60 * 1000)
 
   const isCash = paymentMethod === 'cash'
   const appointmentToken = generateToken()
-  const tokenExpiresAt = calculateTokenExpiry(start, await professionalTimezone(professionalId))
+  const tokenExpiresAt = calculateTokenExpiry(start, timezone, now)
 
   try {
     const appointment = await runSerializable(async (tx) => {
