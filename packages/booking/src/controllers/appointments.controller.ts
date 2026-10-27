@@ -58,6 +58,8 @@ const createSchema = z.object({
   saveClientData: z.boolean().optional(),
   rut: z.string().optional(),
   paymentMethod: z.enum(['transfer', 'cash']).optional(),
+  // US-099: check "Quiero recibir una breve encuesta después de mi sesión" (marcado por defecto).
+  surveyOptIn: z.boolean().optional(),
 })
 
 const rescheduleSchema = z.object({
@@ -77,6 +79,23 @@ function generateToken(): string {
   // Es la única credencial para cancelar/reagendar una cita sin login vía link
   // público — debe ser criptográficamente segura, no adivinable.
   return `tok_${randomUUID()}`
+}
+
+/**
+ * Preferencia de encuesta de la reserva (US-099). Si la paciente se dio de baja antes, el check
+ * aparece desmarcado solo cuando el formulario la reconoce (ficha con consentimiento de datos, ver
+ * lookupClient); en ese caso marcarlo de nuevo es volver a aceptar y se borra la baja. Para el
+ * resto, la baja manda: no se envían encuestas aunque el check llegue marcado por defecto.
+ */
+async function resolveSurveyOptIn(clientEmail: string, requested: boolean): Promise<boolean> {
+  const email = clientEmail.toLowerCase()
+  const optOut = await prisma.surveyOptOut.findUnique({ where: { email } })
+  if (!optOut) return requested
+  if (!requested) return false
+  const client = await prisma.client.findUnique({ where: { email: clientEmail }, select: { dataConsentGiven: true } })
+  if (!client?.dataConsentGiven) return false
+  await prisma.surveyOptOut.delete({ where: { email } })
+  return true
 }
 
 async function professionalTimezone(professionalId: string): Promise<string> {
@@ -103,6 +122,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
 
   const { serviceId, startDateTime, modality, clientName, clientEmail, clientPhone, notes, saveClientData, rut, paymentMethod } =
     parsed.data
+  const surveyOptIn = await resolveSurveyOptIn(clientEmail, parsed.data.surveyOptIn ?? false)
   const professionalId = process.env.PROFESSIONAL_ID ?? ''
 
   const service = await prisma.service.findUnique({ where: { id: serviceId } })
@@ -163,6 +183,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
           paymentDeadline,
           appointmentToken,
           tokenExpiresAt,
+          surveyOptIn,
         },
       })
     })

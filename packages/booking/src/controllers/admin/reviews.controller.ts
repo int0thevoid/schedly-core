@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express'
-import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
 import { initials } from '../../lib/review-name.js'
+import { newReviewToken } from '../../lib/survey.js'
 
 // Moderación de reseñas (US-073), enlace de reseña por sesión (US-072) e importación única desde
 // Agify (US-097).
@@ -124,7 +124,7 @@ export async function getAppointmentReviewLink(req: Request, res: Response): Pro
   }
   let token = appointment.reviewToken
   if (!token) {
-    token = `rev_${randomUUID()}`
+    token = newReviewToken()
     await prisma.appointment.update({ where: { id }, data: { reviewToken: token } })
   }
   const reviewed = await prisma.review.findUnique({ where: { appointmentId: id }, select: { id: true } })

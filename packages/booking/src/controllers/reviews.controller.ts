@@ -170,3 +170,16 @@ export async function submitReview(req: Request, res: Response): Promise<void> {
     throw err
   }
 }
+
+/** "No quiero recibir más encuestas" (enlace del correo, US-100). POST: los escáneres de correo abren los GET. */
+export async function unsubscribeFromSurveys(req: Request, res: Response): Promise<void> {
+  const { token } = req.params as { token: string }
+  const appointment = await prisma.appointment.findUnique({ where: { reviewToken: token }, select: { clientEmail: true } })
+  if (!appointment) {
+    fail(res, 'Enlace no válido', 404)
+    return
+  }
+  const email = appointment.clientEmail.toLowerCase()
+  await prisma.surveyOptOut.upsert({ where: { email }, create: { email }, update: {} })
+  ok(res, { unsubscribed: true })
+}

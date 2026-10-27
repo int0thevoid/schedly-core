@@ -24,12 +24,14 @@ describe('GET /api/clients/lookup', () => {
   it('returns name, phone and dataConsentGiven when the client exists by email', async () => {
     prismaMock.client.findFirst.mockResolvedValue({
       name: 'Ana García',
+      email: 'ana@example.com',
       phone: '+56912345678',
       dataConsentGiven: true,
     })
+    prismaMock.surveyOptOut.findUnique.mockResolvedValue(null)
     const res = await request(app).get('/api/clients/lookup?email=ana@example.com')
     expect(res.status).toBe(200)
-    expect(res.body.data).toEqual({ name: 'Ana García', phone: '+56912345678', dataConsentGiven: true })
+    expect(res.body.data).toEqual({ name: 'Ana García', phone: '+56912345678', dataConsentGiven: true, surveyOptOut: false })
     expect(prismaMock.client.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { email: 'ana@example.com' } }),
     )
@@ -61,10 +63,18 @@ describe('GET /api/clients/lookup', () => {
   })
 
   it('never exposes treatmentType or other sensitive fields', async () => {
-    prismaMock.client.findFirst.mockResolvedValue({ name: 'Ana García', phone: null, dataConsentGiven: true })
+    prismaMock.client.findFirst.mockResolvedValue({ name: 'Ana García', email: 'ana@example.com', phone: null, dataConsentGiven: true })
     const res = await request(app).get('/api/clients/lookup?email=ana@example.com')
     expect(res.body.data).not.toHaveProperty('treatmentType')
     expect(res.body.data).not.toHaveProperty('rut')
     expect(res.body.data).not.toHaveProperty('email')
+  })
+
+  it('tells the booking form when the patient unsubscribed from surveys (US-099)', async () => {
+    prismaMock.client.findFirst.mockResolvedValue({ name: 'Ana García', email: 'Ana@Example.com', phone: null, dataConsentGiven: true })
+    prismaMock.surveyOptOut.findUnique.mockResolvedValue({ email: 'ana@example.com' })
+    const res = await request(app).get('/api/clients/lookup?email=Ana@Example.com')
+    expect(res.body.data.surveyOptOut).toBe(true)
+    expect(prismaMock.surveyOptOut.findUnique).toHaveBeenCalledWith({ where: { email: 'ana@example.com' } })
   })
 })

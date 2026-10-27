@@ -33,6 +33,7 @@ export const prismaMock = {
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
   },
   client: {
     findMany: vi.fn(),
@@ -46,6 +47,11 @@ export const prismaMock = {
     findUnique: vi.fn(),
     create: vi.fn(),
     upsert: vi.fn(),
+  },
+  surveyOptOut: {
+    findUnique: vi.fn(),
+    upsert: vi.fn(),
+    delete: vi.fn(),
   },
   review: {
     findMany: vi.fn(),
