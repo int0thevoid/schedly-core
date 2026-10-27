@@ -16,6 +16,8 @@ export interface AppointmentConfirmationData {
   cancelUrl: string
   /** false si el plazo para modificar/anular por enlace ya venció (cita para el mismo día). */
   canModify?: boolean
+  /** Plazo cuando no es el estándar "23:00 del día anterior" (ej. "las 12:00 (3 horas antes de tu sesión)"). */
+  modifyDeadline?: string
   googleCalendarUrl: string
   startDateTime: Date
   endDateTime: Date
@@ -49,12 +51,16 @@ function hasRealCalendarInvite(data: AppointmentConfirmationData): boolean {
   return data.modality === 'online' && Boolean(data.meetLink)
 }
 
-/** Citas para el mismo día: el plazo (23:00 del día anterior) ya pasó, así que en vez de botones
- * que llevan a "el plazo ha vencido" se indica escribir por WhatsApp. */
+/** Si el plazo ya pasó, en vez de botones que llevan a "el plazo ha vencido" se indica escribir
+ * por WhatsApp. */
 function renderModifyNote(data: AppointmentConfirmationData, okNote: string): string {
-  if (data.canModify !== false) return okNote
+  if (data.canModify !== false) {
+    return data.modifyDeadline
+      ? `<p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Puedes modificar o anular tu cita hasta <strong>${escapeHtml(data.modifyDeadline)}</strong>.</p>`
+      : okNote
+  }
   const contact = data.professionalPhone ? ` por WhatsApp al <strong>${escapeHtml(data.professionalPhone)}</strong>` : ''
-  return `<p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Como tu cita es para hoy, ya no se puede modificar ni anular desde la web. Si necesitas cambiarla, escríbeme${contact}.</p>`
+  return `<p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Ya pasó el plazo para modificar o anular tu cita desde la web. Si necesitas cambiarla, escríbeme${contact}.</p>`
 }
 
 function renderActionButtons(data: AppointmentConfirmationData): string {

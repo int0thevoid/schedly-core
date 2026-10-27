@@ -94,10 +94,19 @@ function getAppointmentColorInfo(appointment: {
     : { color: '#E76F51', colorLabel: 'Sin confirmar ni pagar' }
 }
 
-/** Una cita agendada para el mismo día nace con el enlace ya vencido (plazo: 23:00 del día
- * anterior): el correo no debe ofrecer botones que llevan a "el plazo ha vencido". */
+/** Si el plazo ya venció, el correo no debe ofrecer botones que llevan a "el plazo ha vencido". */
 function canModifyByLink(tokenExpiresAt: Date | null | undefined): boolean {
   return Boolean(tokenExpiresAt) && (tokenExpiresAt as Date) > new Date()
+}
+
+/** Texto del plazo para el correo: "23:00 del día anterior" o, si vence el mismo día de la cita
+ * (agendada para el mismo día), la hora exacta. */
+function modifyDeadlineText(appointment: AppointmentWithService, timezone: string): string | undefined {
+  const expires = appointment.tokenExpiresAt
+  if (!expires) return undefined
+  const sameDay = expires.toLocaleDateString('en-CA', { timeZone: timezone }) ===
+    appointment.startDateTime.toLocaleDateString('en-CA', { timeZone: timezone })
+  return sameDay ? `las ${formatAppointmentTime(expires, timezone)} (3 horas antes de tu sesión)` : undefined
 }
 
 export function buildAppointmentConfirmationData(
@@ -121,6 +130,7 @@ export function buildAppointmentConfirmationData(
     modifyUrl: buildTokenUrl(token, 'modificar'),
     cancelUrl: buildTokenUrl(token, 'anular'),
     canModify: canModifyByLink(appointment.tokenExpiresAt),
+    modifyDeadline: modifyDeadlineText(appointment, professional.timezone),
     googleCalendarUrl: buildGoogleCalendarUrl(appointment, professional),
     startDateTime: appointment.startDateTime,
     endDateTime: appointment.endDateTime,
@@ -198,6 +208,7 @@ export function buildAppointmentModifiedData(
     modifyUrl: buildTokenUrl(newToken, 'modificar'),
     cancelUrl: buildTokenUrl(newToken, 'anular'),
     canModify: canModifyByLink(newAppointment.tokenExpiresAt),
+    modifyDeadline: modifyDeadlineText(newAppointment, professional.timezone),
     googleCalendarUrl: buildGoogleCalendarUrl(newAppointment, professional),
     newStartDateTime: newAppointment.startDateTime,
     newEndDateTime: newAppointment.endDateTime,

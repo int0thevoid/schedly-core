@@ -460,6 +460,44 @@ describe('POST /api/appointments — token generation', () => {
     // Antes quedaba a las 23:00 UTC (20:00 en Chile), tres horas antes de lo que dicen los correos.
     expect((createCall.data.tokenExpiresAt as Date).toISOString()).toBe('2026-12-15T02:00:00.000Z')
   })
+
+  it('same-day booking (Chile date): link valid until 3 hours before the session', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-15T11:00:00Z')) // 08:00 en Chile, mismo día que la cita
+    try {
+      prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+      prismaMock.professional.findUnique.mockResolvedValue({ timezone: 'America/Santiago' })
+      prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+      prismaMock.appointment.findFirst.mockResolvedValue(null)
+      prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+      await request(app).post('/api/appointments').send(VALID_BODY)
+
+      const data = prismaMock.appointment.create.mock.calls[0][0].data
+      expect(data.bookingFlow).toBe('same_day')
+      expect((data.tokenExpiresAt as Date).toISOString()).toBe('2026-12-15T11:00:00.000Z')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('booking at 22:00 Chile for the next day is not same-day (was compared in UTC)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-15T01:00:00Z')) // 14-12 22:00 en Chile; en UTC ya es 15-12
+    try {
+      prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+      prismaMock.professional.findUnique.mockResolvedValue({ timezone: 'America/Santiago' })
+      prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+      prismaMock.appointment.findFirst.mockResolvedValue(null)
+      prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+      await request(app).post('/api/appointments').send(VALID_BODY)
+
+      expect(prismaMock.appointment.create.mock.calls[0][0].data.bookingFlow).toBe('advance')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 function adminToken() {
