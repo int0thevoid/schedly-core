@@ -4,28 +4,41 @@ export interface ReviewRequestData {
   clientName: string
   serviceName: string
   professionalName: string
+  /** Fecha legible de la sesión evaluada, ej. "martes 20 de octubre". */
+  sessionDate: string
+  /** Formulario de reseña de ESTA sesión en el sitio (US-100). */
+  reviewUrl: string
+  /** Enlace para no recibir más encuestas. */
+  unsubscribeUrl: string
+  /** Opcional: además, dejarla en Google. */
   googleReviewLink?: string
 }
 
 export function reviewRequestTemplate(data: ReviewRequestData): EmailTemplate {
-  const subject = `⭐ ¿Cómo fue tu sesión con ${data.professionalName}?`
+  const subject = `⭐ ¿Qué te pareció tu sesión del ${data.sessionDate}?`
 
-  const callToActionHtml = data.googleReviewLink
-    ? `<p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 8px;text-align:center;">
-        <a href="${escapeHtml(data.googleReviewLink)}" style="display:inline-block;background-color:${COLORS.primary};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 24px;border-radius:8px;">Dejar reseña en Google</a>
+  const googleHtml = data.googleReviewLink
+    ? `<p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:12px 0 0;text-align:center;font-size:14px;">
+        <a href="${escapeHtml(data.googleReviewLink)}" style="color:${COLORS.primary};text-decoration:underline;">También puedes dejarla en Google</a>
       </p>`
-    : `<p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 16px;font-size:15px;">Si quieres, puedes responder este correo contándonos tu experiencia. ¡Nos ayuda mucho a seguir mejorando!</p>`
+    : ''
 
   const bodyHtml = `
     <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 16px;font-size:16px;">¡Hola ${escapeHtml(data.clientName)}!</p>
     <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 24px;font-size:16px;">
-      Esperamos que tu sesión de <strong>${escapeHtml(data.serviceName)}</strong> con ${escapeHtml(data.professionalName)} haya sido de tu agrado.
-      Tu opinión es muy importante para nosotros y para otras personas que están buscando ayuda.
+      ¿Qué te pareció tu sesión de <strong>${escapeHtml(data.serviceName)}</strong> del ${escapeHtml(data.sessionDate)}?
+      Tu opinión me ayuda a seguir mejorando y a otras personas a dar el paso. Toma menos de un minuto y puede ser anónima.
     </p>
 
-    ${callToActionHtml}
+    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0;text-align:center;">
+      <a href="${escapeHtml(data.reviewUrl)}" style="display:inline-block;background-color:${COLORS.primary};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 24px;border-radius:8px;">Responder la encuesta</a>
+    </p>
+    ${googleHtml}
 
-    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:24px 0 0;font-size:15px;">¡Gracias por tu confianza!</p>
+    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:24px 0 0;font-size:15px;">¡Gracias por tu confianza!<br>${escapeHtml(data.professionalName)}</p>
+    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:24px 0 0;font-size:12px;color:${COLORS.muted};">
+      ¿No quieres recibir más encuestas? <a href="${escapeHtml(data.unsubscribeUrl)}" style="color:${COLORS.muted};text-decoration:underline;">Darme de baja</a>
+    </p>
   `
 
   return {

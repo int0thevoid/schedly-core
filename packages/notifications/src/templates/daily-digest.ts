@@ -11,11 +11,38 @@ export interface DailyDigestAppointment {
   colorLabel: string
 }
 
+/** Sesión pasada sin "Asistió/No asistió" (US-100: al marcar "Asistió" sale la encuesta). */
+export interface DailyDigestUnmarkedSession {
+  date: string
+  time: string
+  clientName: string
+}
+
 export interface DailyDigestData {
   professionalName: string
   date: string
   appointments: DailyDigestAppointment[]
   adminUrl: string
+  unmarkedSessions?: DailyDigestUnmarkedSession[]
+}
+
+function renderUnmarked(sessions: DailyDigestUnmarkedSession[] | undefined): string {
+  if (!sessions?.length) return ''
+  const rows = sessions
+    .map(
+      (s) => `
+    <tr>
+      <td style="padding:4px 0;width:150px;font-size:14px;color:${COLORS.muted};vertical-align:top;">${escapeHtml(s.date)} · ${escapeHtml(s.time)}</td>
+      <td style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;padding:4px 0;font-size:14px;vertical-align:top;">${escapeHtml(s.clientName)}</td>
+    </tr>`,
+    )
+    .join('')
+  return `
+    <div style="margin-top:24px;padding:16px;border-radius:8px;background-color:#FFF8E6;">
+      <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 8px;font-size:15px;font-weight:600;">Sesiones sin marcar asistencia (${sessions.length})</p>
+      <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 12px;font-size:13px;color:${COLORS.muted};">Márcalas en la Agenda como «Asistió» o «No asistió». Al marcar «Asistió» se envía la encuesta a la paciente (si la aceptó al agendar).</p>
+      <table role="presentation" style="width:100%;border-collapse:collapse;">${rows}</table>
+    </div>`
 }
 
 const LEGEND: { color: string; label: string }[] = [
@@ -63,6 +90,7 @@ export function dailyDigestTemplate(data: DailyDigestData): EmailTemplate {
     <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 24px;font-size:18px;font-weight:600;color:${COLORS.text};">Agenda para mañana, ${escapeHtml(data.date)}</p>
     ${appointmentsHtml}
     ${renderLegend()}
+    ${renderUnmarked(data.unmarkedSessions)}
     <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:24px 0 0;text-align:center;">
       <a href="${escapeHtml(data.adminUrl)}" style="display:inline-block;background-color:${COLORS.primary};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 24px;border-radius:8px;">Ver agenda completa</a>
     </p>

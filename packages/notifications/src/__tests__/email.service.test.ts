@@ -18,6 +18,9 @@ const REVIEW_DATA: ReviewRequestData = {
   clientName: 'Ana Pérez',
   serviceName: 'Primera visita',
   professionalName: 'Ps. Stefany Osorio',
+  sessionDate: 'martes 20 de octubre',
+  reviewUrl: 'https://psstefanyosorio.cl/resena/rev_abc',
+  unsubscribeUrl: 'https://psstefanyosorio.cl/encuestas/baja/rev_abc',
 }
 
 const CONFIRMATION_DATA: AppointmentConfirmationData = {
@@ -99,7 +102,7 @@ describe('EmailService — envío base', () => {
       expect.objectContaining({
         from: 'Ps. Stefany Osorio <noreply@mail.int0thesrv.cl>',
         to: 'ana@test.com',
-        subject: '⭐ ¿Cómo fue tu sesión con Ps. Stefany Osorio?',
+        subject: '⭐ ¿Qué te pareció tu sesión del martes 20 de octubre?',
         html: expect.stringContaining('Ana Pérez'),
       }),
     )

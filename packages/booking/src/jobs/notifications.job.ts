@@ -53,6 +53,8 @@ export async function runNotificationsJob(): Promise<void> {
   }
 }
 
+const UNMARKED_LOOKBACK_DAYS = 7
+
 export async function sendDailyDigestIfNeeded(professional: Professional, emailService: EmailService): Promise<void> {
   const tz = professional.timezone
   const today = todayInTZ(tz)
@@ -75,8 +77,27 @@ export async function sendDailyDigestIfNeeded(professional: Professional, emailS
     orderBy: { startDateTime: 'asc' },
   })
 
+  // US-100: sesiones de los últimos 7 días que Stefany no ha marcado (sin eso no sale la encuesta).
+  const unmarked = await prisma.appointment.findMany({
+    where: {
+      professionalId: professional.id,
+      status: { not: 'cancelled' },
+      outcome: null,
+      startDateTime: { gte: new Date(Date.now() - UNMARKED_LOOKBACK_DAYS * 24 * 60 * 60 * 1000), lte: new Date() },
+    },
+    select: { startDateTime: true, clientName: true },
+    orderBy: { startDateTime: 'asc' },
+  })
+
   const date = formatAppointmentDate(new Date(`${tomorrow}T12:00:00Z`), tz)
-  const data = buildDailyDigestData(appointments as AppointmentWithService[], professional, date)
+  const data = {
+    ...buildDailyDigestData(appointments as AppointmentWithService[], professional, date),
+    unmarkedSessions: unmarked.map((a) => ({
+      date: new Intl.DateTimeFormat('es-CL', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' }).format(a.startDateTime),
+      time: new Intl.DateTimeFormat('es-CL', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(a.startDateTime),
+      clientName: a.clientName,
+    })),
+  }
 
   try {
     await emailService.sendDailyDigest(professional.email, data)

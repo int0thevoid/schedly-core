@@ -142,6 +142,15 @@ model Appointment {
   appointmentToken String?   @unique
   tokenExpiresAt   DateTime?
 
+  // Enlace para dejar una reseña de ESTA sesión (US-072). Se genera cuando se pide la reseña
+  // (panel o correo post-sesión); no vence, pero solo sirve una vez.
+  reviewToken String? @unique
+
+  // Encuesta post-sesión (US-099/100): la paciente la aceptó al agendar (check marcado por
+  // defecto) y cuándo se envió. Se envía cuando Stefany marca la sesión como "Asistió".
+  surveyOptIn  Boolean   @default(false)
+  surveySentAt DateTime?
+
   professional Professional @relation(fields: [professionalId], references: [id])
   service      Service      @relation(fields: [serviceId], references: [id])
 
@@ -182,6 +191,46 @@ model Client {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Reseñas de pacientes (US-072/073/097). Las del sitio quedan ligadas a la sesión evaluada y a la
+// paciente (trazabilidad); las importadas (Agify, Google) solo traen su id externo.
+model Review {
+  id             String   @id @default(cuid())
+  professionalId String
+  // web | agify | google
+  source         String   @default("web")
+  externalId     String?
+  appointmentId  String?  @unique
+  clientId       String?
+  rating         Int
+  comment        String?
+  isAnonymous    Boolean  @default(false)
+  // Nombre que se muestra (lo escribe la paciente; en importadas, iniciales). Null si es anónima.
+  displayName    String?
+  // El nombre escrito no coincide con el de la paciente: Stefany debe verificarlo antes de aprobar.
+  nameMismatch   Boolean  @default(false)
+  // pending | approved | rejected
+  status         String   @default("pending")
+  moderatedAt    DateTime?
+  publicReply    String?
+  repliedAt      DateTime?
+  serviceName    String?
+  // Fecha de la reseña (en importadas, la original de la plataforma).
+  reviewedAt     DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([professionalId, status, reviewedAt])
+}
+
+// Pacientes que pidieron no recibir más encuestas (enlace del correo, US-100). Por email: no
+// depende de que exista una ficha de paciente.
+model SurveyOptOut {
+  email     String   @id
+  createdAt DateTime @default(now())
 }
 
 // Historial de cambios para auditoría: cada creación, modificación o eliminación de datos y eventos

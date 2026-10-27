@@ -23,6 +23,8 @@ import adminGoogleCalendarOauthRouter from './routes/admin/googleCalendarOauth.j
 import adminFinanceRouter from './routes/admin/finance.js'
 import adminAuditRouter from './routes/admin/audit.js'
 import clientsRouter from './routes/clients.js'
+import reviewsRouter from './routes/reviews.js'
+import adminReviewsRouter from './routes/admin/reviews.js'
 import { getTransferConfig } from './controllers/admin/transfer.controller.js'
 import { getPublicConfig } from './controllers/admin/config.controller.js'
 import { getPublicProfessionalPhoto } from './controllers/admin/professional.controller.js'
@@ -94,6 +96,7 @@ app.use('/api/services', servicesRouter)
 app.use('/api/availability', availabilityRouter)
 app.use('/api/appointments', appointmentsRouter)
 app.use('/api/clients', clientsRouter)
+app.use('/api/reviews', reviewsRouter)
 
 // Public: booking wizard needs these without auth
 app.get('/api/config', getPublicConfig)
@@ -116,6 +119,7 @@ app.use('/api/admin/cancellation-policy', adminCancellationPolicyRouter)
 app.use('/api/admin/google-calendar', adminGoogleCalendarOauthRouter)
 app.use('/api/admin/finance', adminFinanceRouter)
 app.use('/api/admin/audit', adminAuditRouter)
+app.use('/api/admin/reviews', adminReviewsRouter)
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err)

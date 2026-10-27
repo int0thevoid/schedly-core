@@ -42,6 +42,6 @@ export function sanitizeSource(method: string, url: string): string {
 
 /** Tipo de actor según la ruta, antes de autenticar: el sitio público lo usan pacientes. */
 export function actorTypeForPath(path: string): AuditActorType {
-  if (path.startsWith('/api/appointments') || path.startsWith('/api/clients')) return 'patient'
+  if (path.startsWith('/api/appointments') || path.startsWith('/api/clients') || path.startsWith('/api/reviews')) return 'patient'
   return 'anonymous'
 }
