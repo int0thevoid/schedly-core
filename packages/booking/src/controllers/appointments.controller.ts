@@ -400,6 +400,8 @@ export async function rescheduleAppointment(
         bookingFlow: 'advance',
         appointmentToken: generateToken(),
         tokenExpiresAt: calculateTokenExpiry(newStart, timezone),
+        // Reagendar no cambia lo que la paciente eligió sobre la encuesta (US-099).
+        surveyOptIn: originalAppointment.surveyOptIn,
       },
       include: { service: true },
     })
