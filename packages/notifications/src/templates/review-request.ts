@@ -15,7 +15,10 @@ export interface ReviewRequestData {
 }
 
 export function reviewRequestTemplate(data: ReviewRequestData): EmailTemplate {
-  const subject = `⭐ ¿Qué te pareció tu sesión del ${data.sessionDate}?`
+  // Asunto y texto informativos, ligados a la sesión: con tono de campaña (estrella, "tu opinión
+  // ayuda…") Gmail lo dejaba en Promociones, mientras la confirmación y el recordatorio van a
+  // Notificaciones, y las pacientes creían que no había llegado.
+  const subject = `Sobre tu sesión de ${data.serviceName} del ${data.sessionDate}`
 
   const googleHtml = data.googleReviewLink
     ? `<p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:12px 0 0;text-align:center;font-size:14px;">
@@ -26,8 +29,8 @@ export function reviewRequestTemplate(data: ReviewRequestData): EmailTemplate {
   const bodyHtml = `
     <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 16px;font-size:16px;">¡Hola ${escapeHtml(data.clientName)}!</p>
     <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0 0 24px;font-size:16px;">
-      ¿Qué te pareció tu sesión de <strong>${escapeHtml(data.serviceName)}</strong> del ${escapeHtml(data.sessionDate)}?
-      Tu opinión me ayuda a seguir mejorando y a otras personas a dar el paso. Toma menos de un minuto y puede ser anónima.
+      Tuviste tu sesión de <strong>${escapeHtml(data.serviceName)}</strong> el ${escapeHtml(data.sessionDate)}.
+      ¿Qué te pareció? Puedes contármelo en este enlace; toma menos de un minuto y puede ser anónimo.
     </p>
 
     <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:0;text-align:center;">
@@ -35,7 +38,7 @@ export function reviewRequestTemplate(data: ReviewRequestData): EmailTemplate {
     </p>
     ${googleHtml}
 
-    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:24px 0 0;font-size:15px;">¡Gracias por tu confianza!<br>${escapeHtml(data.professionalName)}</p>
+    <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:24px 0 0;font-size:15px;">Gracias,<br>${escapeHtml(data.professionalName)}</p>
     <p style="word-wrap:break-word;overflow-wrap:break-word;max-width:100%;margin:24px 0 0;font-size:12px;color:${COLORS.muted};">
       ¿No quieres recibir más encuestas? <a href="${escapeHtml(data.unsubscribeUrl)}" style="color:${COLORS.muted};text-decoration:underline;">Darme de baja</a>
     </p>

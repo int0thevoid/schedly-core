@@ -517,7 +517,7 @@ describe('reviewRequestTemplate', () => {
 
   it('asks about the specific session', () => {
     const { subject, html } = reviewRequestTemplate(baseData)
-    expect(subject).toBe('⭐ ¿Qué te pareció tu sesión del martes 20 de octubre?')
+    expect(subject).toBe('Sobre tu sesión de Primera visita del martes 20 de octubre')
     expect(html).toContain('Primera visita')
   })
 
