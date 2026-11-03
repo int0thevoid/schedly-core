@@ -394,6 +394,7 @@ describe('PATCH /api/appointments/token/:token/reschedule', () => {
       status: 'pending',
       appointmentToken: 'tok_valid',
       tokenExpiresAt: future,
+      surveyOptIn: true,
       service: SERVICE,
     }
     prismaMock.appointment.findUnique.mockResolvedValue(apt)
@@ -409,6 +410,8 @@ describe('PATCH /api/appointments/token/:token/reschedule', () => {
     })
     expect(res.status).toBe(200)
     expect(prismaMock.appointment.create).toHaveBeenCalled()
+    // Reagendar conserva lo que la paciente eligió sobre la encuesta (US-099).
+    expect(prismaMock.appointment.create.mock.calls[0][0].data.surveyOptIn).toBe(true)
     // Registro de canceladas (US-088): la original queda como reagendada y apunta a la nueva.
     expect(prismaMock.appointment.update).toHaveBeenCalledWith(
       expect.objectContaining({

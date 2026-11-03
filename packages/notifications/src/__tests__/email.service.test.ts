@@ -102,7 +102,7 @@ describe('EmailService — envío base', () => {
       expect.objectContaining({
         from: 'Ps. Stefany Osorio <noreply@mail.int0thesrv.cl>',
         to: 'ana@test.com',
-        subject: '⭐ ¿Qué te pareció tu sesión del martes 20 de octubre?',
+        subject: 'Sobre tu sesión de Primera visita del martes 20 de octubre',
         html: expect.stringContaining('Ana Pérez'),
       }),
     )
