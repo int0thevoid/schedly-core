@@ -60,6 +60,8 @@ const createSchema = z.object({
   paymentMethod: z.enum(['transfer', 'cash']).optional(),
   // US-099: check "Quiero recibir una breve encuesta después de mi sesión" (marcado por defecto).
   surveyOptIn: z.boolean().optional(),
+  // Cita manual desde el panel: marcar el check no reactiva a quien se dio de baja (lo decide ella).
+  keepSurveyOptOut: z.boolean().optional(),
 })
 
 const rescheduleSchema = z.object({
@@ -87,11 +89,11 @@ function generateToken(): string {
  * lookupClient); en ese caso marcarlo de nuevo es volver a aceptar y se borra la baja. Para el
  * resto, la baja manda: no se envían encuestas aunque el check llegue marcado por defecto.
  */
-async function resolveSurveyOptIn(clientEmail: string, requested: boolean): Promise<boolean> {
+async function resolveSurveyOptIn(clientEmail: string, requested: boolean, keepOptOut: boolean): Promise<boolean> {
   const email = clientEmail.toLowerCase()
   const optOut = await prisma.surveyOptOut.findUnique({ where: { email } })
   if (!optOut) return requested
-  if (!requested) return false
+  if (!requested || keepOptOut) return false
   const client = await prisma.client.findUnique({ where: { email: clientEmail }, select: { dataConsentGiven: true } })
   if (!client?.dataConsentGiven) return false
   await prisma.surveyOptOut.delete({ where: { email } })
@@ -122,7 +124,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
 
   const { serviceId, startDateTime, modality, clientName, clientEmail, clientPhone, notes, saveClientData, rut, paymentMethod } =
     parsed.data
-  const surveyOptIn = await resolveSurveyOptIn(clientEmail, parsed.data.surveyOptIn ?? false)
+  const surveyOptIn = await resolveSurveyOptIn(clientEmail, parsed.data.surveyOptIn ?? false, parsed.data.keepSurveyOptOut ?? false)
   const professionalId = process.env.PROFESSIONAL_ID ?? ''
 
   const service = await prisma.service.findUnique({ where: { id: serviceId } })

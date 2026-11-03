@@ -155,6 +155,14 @@ describe('POST /api/appointments — survey opt-in (US-099)', () => {
     expect(prismaMock.surveyOptOut.delete).not.toHaveBeenCalled()
   })
 
+  it('a manual booking from the panel never clears the opt-out', async () => {
+    prismaMock.surveyOptOut.findUnique.mockResolvedValue({ email: 'ana@example.com' })
+    prismaMock.client.findUnique.mockResolvedValue({ dataConsentGiven: true })
+    await request(app).post('/api/appointments').send({ ...BODY, surveyOptIn: true, keepSurveyOptOut: true })
+    expect(prismaMock.appointment.create.mock.calls[0][0].data.surveyOptIn).toBe(false)
+    expect(prismaMock.surveyOptOut.delete).not.toHaveBeenCalled()
+  })
+
   it('a recognized patient who re-checks it subscribes again', async () => {
     prismaMock.surveyOptOut.findUnique.mockResolvedValue({ email: 'ana@example.com' })
     prismaMock.client.findUnique.mockResolvedValue({ dataConsentGiven: true })
