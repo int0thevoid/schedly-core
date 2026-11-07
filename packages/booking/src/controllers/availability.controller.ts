@@ -2,7 +2,7 @@ import type { Request, Response } from 'express'
 import { z } from 'zod'
 import type { Appointment, ScheduleBlock, Service, TimeSlot, WeeklySchedule } from '../types.js'
 import { DEFAULT_PROFESSIONAL_CONFIG } from '../types.js'
-import { getAvailableSlots } from '../availability.js'
+import { getAdminDaySlots, getAvailableSlots } from '../availability.js'
 import { prisma } from '../lib/prisma.js'
 import { fail, ok } from '../lib/response.js'
 import { dayRangeInTZ } from '../lib/date.js'
@@ -230,4 +230,33 @@ export async function getRangeAvailability(req: Request, res: Response): Promise
   }
 
   ok(res, result)
+}
+
+/** Horas para la cita manual del panel (sin las reglas de anticipación ni ventana para pacientes). */
+export async function getAdminDayAvailability(req: Request, res: Response): Promise<void> {
+  const parsed = daySchema.safeParse(req.query)
+  if (!parsed.success) {
+    fail(res, parsed.error.issues[0]?.message ?? 'Invalid params', 400)
+    return
+  }
+  const { serviceId, date } = parsed.data
+  const professionalId = req.professionalId ?? ''
+  const { service, professional, weeklySchedules, blocks, appointments } =
+    await fetchContextForDate(professionalId, serviceId, date)
+  if (!service || service.professionalId !== professionalId) {
+    fail(res, 'Service not found', 404)
+    return
+  }
+  const config = toConfig(professional)
+  ok(
+    res,
+    getAdminDaySlots(
+      new Date(`${date}T12:00:00.000Z`),
+      toService(service),
+      weeklySchedules.map(toWeeklySchedule),
+      blocks.map(toBlock),
+      appointments.map((a) => toAppointment(a, config.defaultBufferMinutes)),
+      config.defaultBufferMinutes,
+    ),
+  )
 }
