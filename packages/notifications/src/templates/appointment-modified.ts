@@ -77,11 +77,11 @@ export function appointmentModifiedTemplate(data: AppointmentModifiedData): Emai
 
     <div style="background-color:${COLORS.primaryFaint};border-radius:8px;padding:20px;margin-bottom:24px;">
       <table role="presentation" style="width:100%;border-collapse:collapse;font-size:15px;">
-        <tr><td style="padding:6px 0;color:${COLORS.muted};width:120px;">Servicio</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(data.newServiceName)}</td></tr>
-        <tr><td style="padding:6px 0;color:${COLORS.muted};">Fecha</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(data.newDate)}</td></tr>
-        <tr><td style="padding:6px 0;color:${COLORS.muted};">Horario</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(data.newStartTime)} – ${escapeHtml(data.newEndTime)}</td></tr>
-        <tr><td style="padding:6px 0;color:${COLORS.muted};">Modalidad</td><td style="padding:6px 0;font-weight:600;">${data.modality === 'presential' ? 'Presencial' : 'Online'}</td></tr>
-        <tr><td style="padding:6px 0;color:${COLORS.muted};">Valor</td><td style="padding:6px 0;font-weight:600;">${formatCLP(data.price)}</td></tr>
+        <tr><td style="padding:6px 0;color:${COLORS.muted};width:1%;vertical-align:top;white-space:nowrap;padding-right:12px;">Servicio</td><td style="padding:6px 0;font-weight:600;vertical-align:top;word-break:break-word;">${escapeHtml(data.newServiceName)}</td></tr>
+        <tr><td style="padding:6px 0;color:${COLORS.muted};width:1%;vertical-align:top;white-space:nowrap;padding-right:12px;">Fecha</td><td style="padding:6px 0;font-weight:600;vertical-align:top;word-break:break-word;">${escapeHtml(data.newDate)}</td></tr>
+        <tr><td style="padding:6px 0;color:${COLORS.muted};width:1%;vertical-align:top;white-space:nowrap;padding-right:12px;">Horario</td><td style="padding:6px 0;font-weight:600;vertical-align:top;word-break:break-word;">${escapeHtml(data.newStartTime)} – ${escapeHtml(data.newEndTime)}</td></tr>
+        <tr><td style="padding:6px 0;color:${COLORS.muted};width:1%;vertical-align:top;white-space:nowrap;padding-right:12px;">Modalidad</td><td style="padding:6px 0;font-weight:600;vertical-align:top;word-break:break-word;">${data.modality === 'presential' ? 'Presencial' : 'Online'}</td></tr>
+        <tr><td style="padding:6px 0;color:${COLORS.muted};width:1%;vertical-align:top;white-space:nowrap;padding-right:12px;">Valor</td><td style="padding:6px 0;font-weight:600;vertical-align:top;word-break:break-word;">${formatCLP(data.price)}</td></tr>
       </table>
     </div>
 
