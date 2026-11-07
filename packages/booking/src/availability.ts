@@ -221,7 +221,7 @@ export function doesBlockApplyToDate(block: ScheduleBlock, date: Date): boolean 
  * Para bloqueos recurrentes proyecta la ventana horaria sobre la fecha del slot.
  */
 /** Bloqueo de horario que se cruza con el slot (o undefined). */
-export function findBlockForSlot(slot: TimeSlot, blocks: ScheduleBlock[]): ScheduleBlock | undefined {
+function findBlockForSlot(slot: TimeSlot, blocks: ScheduleBlock[]): ScheduleBlock | undefined {
   return blocks.find(block => {
     if (!doesBlockApplyToDate(block, slot.startDateTime)) return false
 
@@ -335,7 +335,7 @@ export function getAvailableSlots(
 
 // ─── Horas para la cita manual del panel ────────────────────────────────────
 
-export interface AdminSlot {
+interface AdminSlot {
   startDateTime: Date
   endDateTime: Date
   /** Por qué una paciente no podría tomarla en la web (null si podría). Stefany igual puede elegirla. */
