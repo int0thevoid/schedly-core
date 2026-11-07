@@ -28,17 +28,17 @@ export function professionalRescheduleNoticeTemplate(data: ProfessionalReschedul
 
     <div style="background-color:${COLORS.primaryFaint};border-radius:8px;padding:20px;margin-bottom:20px;">
       <table role="presentation" style="width:100%;border-collapse:collapse;font-size:15px;">
-        <tr><td style="padding:4px 0;color:${COLORS.muted};width:110px;">Antes</td><td style="padding:4px 0;text-decoration:line-through;">${escapeHtml(data.previousDate)}, ${escapeHtml(data.previousStartTime)}</td></tr>
-        <tr><td style="padding:4px 0;color:${COLORS.muted};">Ahora</td><td style="padding:4px 0;"><strong>${escapeHtml(data.newDate)}, ${escapeHtml(data.newStartTime)}</strong></td></tr>
-        <tr><td style="padding:4px 0;color:${COLORS.muted};">Servicio</td><td style="padding:4px 0;">${escapeHtml(data.serviceName)} · ${modality}</td></tr>
+        <tr><td style="padding:4px 0;color:${COLORS.muted};width:1%;vertical-align:top;white-space:nowrap;padding-right:12px;">Antes</td><td style="padding:4px 0;text-decoration:line-through;vertical-align:top;word-break:break-word;">${escapeHtml(data.previousDate)}, ${escapeHtml(data.previousStartTime)}</td></tr>
+        <tr><td style="padding:4px 0;color:${COLORS.muted};width:1%;vertical-align:top;white-space:nowrap;padding-right:12px;">Ahora</td><td style="padding:4px 0;vertical-align:top;word-break:break-word;"><strong>${escapeHtml(data.newDate)}, ${escapeHtml(data.newStartTime)}</strong></td></tr>
+        <tr><td style="padding:4px 0;color:${COLORS.muted};width:1%;vertical-align:top;white-space:nowrap;padding-right:12px;">Servicio</td><td style="padding:4px 0;vertical-align:top;word-break:break-word;">${escapeHtml(data.serviceName)} · ${modality}</td></tr>
       </table>
     </div>
 
     <div style="background-color:${COLORS.primaryFaint};border-radius:8px;padding:20px;margin-bottom:28px;">
       <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:${COLORS.muted};text-transform:uppercase;letter-spacing:.5px;">Datos de contacto</p>
       <table role="presentation" style="width:100%;border-collapse:collapse;font-size:15px;">
-        <tr><td style="padding:4px 0;color:${COLORS.muted};width:110px;">Email</td><td style="padding:4px 0;">${escapeHtml(data.clientEmail)}</td></tr>
-        <tr><td style="padding:4px 0;color:${COLORS.muted};">Teléfono</td><td style="padding:4px 0;">${escapeHtml(data.clientPhone)}</td></tr>
+        <tr><td style="padding:4px 0;color:${COLORS.muted};width:1%;vertical-align:top;white-space:nowrap;padding-right:12px;">Email</td><td style="padding:4px 0;vertical-align:top;overflow-wrap:anywhere;word-break:break-all;">${escapeHtml(data.clientEmail)}</td></tr>
+        <tr><td style="padding:4px 0;color:${COLORS.muted};width:1%;vertical-align:top;white-space:nowrap;padding-right:12px;">Teléfono</td><td style="padding:4px 0;vertical-align:top;word-break:break-word;">${escapeHtml(data.clientPhone)}</td></tr>
       </table>
     </div>
 
