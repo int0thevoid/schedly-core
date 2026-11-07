@@ -220,22 +220,23 @@ export function doesBlockApplyToDate(block: ScheduleBlock, date: Date): boolean 
  * Marca como no disponibles los slots que se solapan con algún bloqueo.
  * Para bloqueos recurrentes proyecta la ventana horaria sobre la fecha del slot.
  */
-export function filterBlockedSlots(slots: TimeSlot[], blocks: ScheduleBlock[]): TimeSlot[] {
-  return slots.map(slot => {
-    const isBlocked = blocks.some(block => {
-      if (!doesBlockApplyToDate(block, slot.startDateTime)) return false
+/** Bloqueo de horario que se cruza con el slot (o undefined). */
+export function findBlockForSlot(slot: TimeSlot, blocks: ScheduleBlock[]): ScheduleBlock | undefined {
+  return blocks.find(block => {
+    if (!doesBlockApplyToDate(block, slot.startDateTime)) return false
 
-      if (!block.recurrence) {
-        return slot.startDateTime < block.endDateTime && slot.endDateTime > block.startDateTime
-      }
+    if (!block.recurrence) {
+      return slot.startDateTime < block.endDateTime && slot.endDateTime > block.startDateTime
+    }
 
-      const blockStart = projectTimeOnDate(block.startDateTime, slot.startDateTime, TIMEZONE)
-      const blockEnd = projectTimeOnDate(block.endDateTime, slot.startDateTime, TIMEZONE)
-      return slot.startDateTime < blockEnd && slot.endDateTime > blockStart
-    })
-
-    return isBlocked ? { ...slot, isAvailable: false } : slot
+    const blockStart = projectTimeOnDate(block.startDateTime, slot.startDateTime, TIMEZONE)
+    const blockEnd = projectTimeOnDate(block.endDateTime, slot.startDateTime, TIMEZONE)
+    return slot.startDateTime < blockEnd && slot.endDateTime > blockStart
   })
+}
+
+export function filterBlockedSlots(slots: TimeSlot[], blocks: ScheduleBlock[]): TimeSlot[] {
+  return slots.map(slot => (findBlockForSlot(slot, blocks) ? { ...slot, isAvailable: false } : slot))
 }
 
 /**
@@ -330,4 +331,55 @@ export function getAvailableSlots(
   )
 
   return filterOccupiedSlots(filterBlockedSlots(inWindow, blocks), appointments, buffer).filter(s => s.isAvailable)
+}
+
+// ─── Horas para la cita manual del panel ────────────────────────────────────
+
+export interface AdminSlot {
+  startDateTime: Date
+  endDateTime: Date
+  /** Por qué una paciente no podría tomarla en la web (null si podría). Stefany igual puede elegirla. */
+  note: string | null
+}
+
+/**
+ * Horas del día para agendar desde el panel: Stefany ve todas las horas de su horario semanal,
+ * sin las reglas pensadas para pacientes (anticipación mínima, semanas máximas, horario por
+ * servicio). Sus bloqueos y el descanso entre sesiones no ocultan la hora: se indican en `note`.
+ * Solo se excluyen las horas que se cruzan con otra cita (no se puede atender a dos a la vez).
+ */
+export function getAdminDaySlots(
+  date: Date,
+  service: Service,
+  weeklySchedule: WeeklySchedule[],
+  blocks: ScheduleBlock[],
+  appointments: Appointment[],
+  defaultBufferMinutes: number,
+  now: Date = new Date(),
+): AdminSlot[] {
+  const dow = dayOfWeekInSantiago(date)
+  const byStart = new Map<number, TimeSlot>()
+  for (const schedule of weeklySchedule.filter(s => s.dayOfWeek === dow && s.isActive !== false)) {
+    for (const slot of generateDaySlots(date, [schedule], service.duration)) {
+      byStart.set(slot.startDateTime.getTime(), slot)
+    }
+  }
+  const slots = [...byStart.values()].sort((a, b) => a.startDateTime.getTime() - b.startDateTime.getTime())
+
+  const active = appointments.filter(a => a.status !== 'cancelled')
+  const buffer = service.bufferMinutes ?? defaultBufferMinutes
+  return slots
+    .filter(slot => !active.some(apt => slot.startDateTime < apt.endDateTime && slot.endDateTime > apt.startDateTime))
+    .map(slot => {
+      const block = findBlockForSlot(slot, blocks)
+      const noRest = filterOccupiedSlots([slot], active, buffer)[0]?.isAvailable === false
+      const note = block
+        ? `Bloqueado: ${block.title}`
+        : noRest
+          ? 'Sin descanso entre sesiones'
+          : slot.startDateTime < now
+            ? 'Hora ya pasada'
+            : null
+      return { startDateTime: slot.startDateTime, endDateTime: slot.endDateTime, note }
+    })
 }
