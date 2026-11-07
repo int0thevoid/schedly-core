@@ -28,6 +28,7 @@ import adminReviewsRouter from './routes/admin/reviews.js'
 import { getTransferConfig } from './controllers/admin/transfer.controller.js'
 import { getPublicConfig } from './controllers/admin/config.controller.js'
 import { getPublicProfessionalPhoto } from './controllers/admin/professional.controller.js'
+import { getAdminDayAvailability } from './controllers/availability.controller.js'
 import { getPublicConsentDocument, getPublicCancellationPolicy } from './controllers/admin/consent-document.controller.js'
 import { fail } from './lib/response.js'
 import { actorTypeForPath, runWithAuditContext, sanitizeSource } from './lib/audit-context.js'
@@ -120,6 +121,7 @@ app.use('/api/admin/google-calendar', adminGoogleCalendarOauthRouter)
 app.use('/api/admin/finance', adminFinanceRouter)
 app.use('/api/admin/audit', adminAuditRouter)
 app.use('/api/admin/reviews', adminReviewsRouter)
+app.get('/api/admin/availability', getAdminDayAvailability)
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err)
