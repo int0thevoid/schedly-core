@@ -8,7 +8,7 @@ vi.mock('../lib/email-service.js', () => ({ getEmailService: () => ({ sendReview
 
 import { prismaMock, resetMocks } from './helpers/prisma-mock.js'
 import app from '../app.js'
-import { sendPostSessionSurveyIfEligible } from '../lib/survey.js'
+import { getSurveyPreference, sendPostSessionSurveyIfEligible } from '../lib/survey.js'
 
 function adminCookie() {
   return `auth_token=${jwt.sign({ professionalId: 'pro1', role: 'admin' }, process.env.JWT_SECRET ?? 'dev-secret')}`
@@ -169,5 +169,35 @@ describe('POST /api/appointments — survey opt-in (US-099)', () => {
     await request(app).post('/api/appointments').send({ ...BODY, surveyOptIn: true })
     expect(prismaMock.appointment.create.mock.calls[0][0].data.surveyOptIn).toBe(true)
     expect(prismaMock.surveyOptOut.delete).toHaveBeenCalledWith({ where: { email: 'ana@example.com' } })
+  })
+})
+
+describe('getSurveyPreference (check de la cita manual)', () => {
+  it('checked by default', async () => {
+    prismaMock.surveyOptOut.findUnique.mockResolvedValue(null)
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    expect(await getSurveyPreference('Ana@x.cl')).toEqual({ optIn: true, reason: 'default' })
+  })
+
+  it('unchecked if the patient unsubscribed', async () => {
+    prismaMock.surveyOptOut.findUnique.mockResolvedValue({ email: 'ana@x.cl' })
+    expect(await getSurveyPreference('Ana@x.cl')).toEqual({ optIn: false, reason: 'opted_out' })
+  })
+
+  it('unchecked if she unchecked it in her last booking (only bookings since the feature)', async () => {
+    prismaMock.surveyOptOut.findUnique.mockResolvedValue(null)
+    prismaMock.appointment.findFirst.mockResolvedValue({ surveyOptIn: false })
+    expect(await getSurveyPreference('ana@x.cl')).toEqual({ optIn: false, reason: 'last_choice' })
+    const calls = prismaMock.appointment.findFirst.mock.calls
+    const where = calls[calls.length - 1][0].where
+    expect(where.createdAt.gte.toISOString()).toBe('2026-10-28T03:00:00.000Z')
+  })
+
+  it('GET /api/admin/clients/survey-preference requires auth and returns the preference', async () => {
+    expect((await request(app).get('/api/admin/clients/survey-preference?email=ana@x.cl')).status).toBe(401)
+    prismaMock.surveyOptOut.findUnique.mockResolvedValue(null)
+    prismaMock.appointment.findFirst.mockResolvedValue({ surveyOptIn: true })
+    const res = await request(app).get('/api/admin/clients/survey-preference?email=ana@x.cl').set('Cookie', adminCookie())
+    expect(res.body.data).toEqual({ optIn: true, reason: 'default' })
   })
 })
