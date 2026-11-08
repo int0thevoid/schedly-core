@@ -91,3 +91,24 @@ export async function sendPostSessionSurveyIfEligible(appointmentId: string): Pr
     return 'failed'
   }
 }
+
+// Desde aquí las reservas guardan la elección de la encuesta (US-099, en producción el 27-10-2026).
+// Las citas anteriores tienen surveyOptIn=false por defecto y no son una elección de la paciente.
+const SURVEY_CHOICE_SINCE = new Date('2026-10-28T00:00:00-03:00')
+
+type SurveyPreference = { optIn: boolean; reason: 'opted_out' | 'last_choice' | 'default' }
+
+/**
+ * Valor por defecto del check de encuesta en la cita manual del panel: marcado, salvo que la
+ * paciente se haya dado de baja o haya desmarcado el check en su última reserva.
+ */
+export async function getSurveyPreference(email: string): Promise<SurveyPreference> {
+  if (await isOptedOut(email)) return { optIn: false, reason: 'opted_out' }
+  const last = await prisma.appointment.findFirst({
+    where: { clientEmail: { equals: email, mode: 'insensitive' }, createdAt: { gte: SURVEY_CHOICE_SINCE } },
+    orderBy: { createdAt: 'desc' },
+    select: { surveyOptIn: true },
+  })
+  if (last && !last.surveyOptIn) return { optIn: false, reason: 'last_choice' }
+  return { optIn: true, reason: 'default' }
+}

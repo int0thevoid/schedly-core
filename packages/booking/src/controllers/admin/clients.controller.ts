@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
+import { getSurveyPreference } from '../../lib/survey.js'
 
 const querySchema = z.object({
   q: z.string().min(1).optional(),
@@ -159,4 +160,16 @@ export async function saveClient(req: Request, res: Response): Promise<void> {
       })
 
   ok(res, client, existing ? 200 : 201)
+}
+
+const surveyPreferenceSchema = z.object({ email: z.string().trim().email() })
+
+/** Check de encuesta para la cita manual (US-099): marcado salvo baja o check desmarcado en su última reserva. */
+export async function getClientSurveyPreference(req: Request, res: Response): Promise<void> {
+  const parsed = surveyPreferenceSchema.safeParse(req.query)
+  if (!parsed.success) {
+    fail(res, 'Email inválido', 400)
+    return
+  }
+  ok(res, await getSurveyPreference(parsed.data.email))
 }
