@@ -90,6 +90,18 @@ export async function changePassword(req: Request, res: Response): Promise<void>
     return
   }
 
+  // Una cuenta adicional del panel cambia su propia contraseña, no la de la profesional.
+  if (req.adminUserId) {
+    const adminUser = await prisma.adminUser.findUnique({ where: { id: req.adminUserId } })
+    if (!adminUser || !(await bcrypt.compare(parsed.data.currentPassword, adminUser.passwordHash))) {
+      fail(res, 'Contraseña actual incorrecta', 401)
+      return
+    }
+    await prisma.adminUser.update({ where: { id: adminUser.id }, data: { passwordHash: await bcrypt.hash(parsed.data.newPassword, 10) } })
+    ok(res, { message: 'Contraseña actualizada' })
+    return
+  }
+
   const professionalId = req.professionalId ?? ''
   const professional = await prisma.professional.findUnique({ where: { id: professionalId } })
   if (!professional) {

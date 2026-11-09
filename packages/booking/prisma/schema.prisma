@@ -46,6 +46,7 @@ model Professional {
   appointments     Appointment[]
   consentDocuments ConsentDocument[]
   products         Product[]
+  adminUsers       AdminUser[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -286,4 +287,18 @@ model Product {
   updatedAt DateTime @updatedAt
 
   @@index([professionalId, isPublished, position])
+}
+
+// Cuentas adicionales del panel (además de la de la profesional, que entra con Professional.email).
+// Entran al mismo panel con los mismos permisos; el historial guarda su id como actorId.
+model AdminUser {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  email          String       @unique
+  name           String
+  passwordHash   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

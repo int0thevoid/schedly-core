@@ -22,12 +22,13 @@ export function getAuditContext(): AuditContext | undefined {
   return storage.getStore()
 }
 
-/** Marca la petición en curso como hecha por la administradora (lo llama requireAuth). */
-export function setAuditAdmin(professionalId: string): void {
+/** Marca la petición en curso como hecha por la administradora (lo llama requireAuth). Con una
+ * cuenta adicional del panel, actorId es el id de esa cuenta (AdminUser). */
+export function setAuditAdmin(professionalId: string, adminUserId?: string): void {
   const context = storage.getStore()
   if (!context) return
   context.actorType = 'admin'
-  context.actorId = professionalId
+  context.actorId = adminUserId ?? professionalId
   context.professionalId = professionalId
 }
 
