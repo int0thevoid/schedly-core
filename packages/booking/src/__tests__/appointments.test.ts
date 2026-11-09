@@ -448,7 +448,7 @@ describe('PATCH /api/appointments/token/:token/reschedule', () => {
 })
 
 describe('POST /api/appointments — token generation', () => {
-  it('stores appointmentToken and tokenExpiresAt at 23:00 (Chile) the day before', async () => {
+  it('stores appointmentToken and tokenExpiresAt 4 hours before the session (default, US-092)', async () => {
     prismaMock.service.findUnique.mockResolvedValue(SERVICE)
     prismaMock.professional.findUnique.mockResolvedValue({ timezone: 'America/Santiago' })
     prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
@@ -459,17 +459,16 @@ describe('POST /api/appointments — token generation', () => {
 
     const createCall = prismaMock.appointment.create.mock.calls[0][0]
     expect(createCall.data.appointmentToken).toBeDefined()
-    // Cita 15-12 11:00 en Chile (UTC-3 en verano) → plazo 14-12 23:00 en Chile = 15-12 02:00 UTC.
-    // Antes quedaba a las 23:00 UTC (20:00 en Chile), tres horas antes de lo que dicen los correos.
-    expect((createCall.data.tokenExpiresAt as Date).toISOString()).toBe('2026-12-15T02:00:00.000Z')
+    // Cita 15-12 14:00 UTC (11:00 en Chile) → plazo 4 h antes = 10:00 UTC.
+    expect((createCall.data.tokenExpiresAt as Date).toISOString()).toBe('2026-12-15T10:00:00.000Z')
   })
 
-  it('same-day booking (Chile date): link valid until 3 hours before the session', async () => {
+  it('uses the configured modifyDeadlineHours (same-day booking, 2 h)', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-12-15T11:00:00Z')) // 08:00 en Chile, mismo día que la cita
     try {
       prismaMock.service.findUnique.mockResolvedValue(SERVICE)
-      prismaMock.professional.findUnique.mockResolvedValue({ timezone: 'America/Santiago' })
+      prismaMock.professional.findUnique.mockResolvedValue({ timezone: 'America/Santiago', modifyDeadlineHours: 2 })
       prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
       prismaMock.appointment.findFirst.mockResolvedValue(null)
       prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
@@ -478,7 +477,7 @@ describe('POST /api/appointments — token generation', () => {
 
       const data = prismaMock.appointment.create.mock.calls[0][0].data
       expect(data.bookingFlow).toBe('same_day')
-      expect((data.tokenExpiresAt as Date).toISOString()).toBe('2026-12-15T11:00:00.000Z')
+      expect((data.tokenExpiresAt as Date).toISOString()).toBe('2026-12-15T12:00:00.000Z')
     } finally {
       vi.useRealTimers()
     }

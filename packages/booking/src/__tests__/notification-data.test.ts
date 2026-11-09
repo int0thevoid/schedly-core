@@ -93,6 +93,29 @@ describe('buildAppointmentConfirmationData', () => {
 describe('buildAppointmentReminderData', () => {
   afterEach(() => {
     delete process.env.PUBLIC_API_URL
+    if (ORIGINAL_FRONTEND_URL === undefined) delete process.env.FRONTEND_URL
+    else process.env.FRONTEND_URL = ORIGINAL_FRONTEND_URL
+  })
+
+  it('US-102: includes change/cancel links and the deadline (4 h before) while the link is valid', () => {
+    process.env.FRONTEND_URL = 'https://agenda.example.com'
+    const start = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+    const apt = { ...APPOINTMENT, startDateTime: start, tokenExpiresAt: new Date(start.getTime() - 4 * 60 * 60 * 1000) } as AppointmentWithService
+    const data = buildAppointmentReminderData(apt, PROFESSIONAL, 'day_before')
+    expect(data.modifyUrl).toBe('https://agenda.example.com/cita/tok_abc123/modificar')
+    expect(data.cancelUrl).toBe('https://agenda.example.com/cita/tok_abc123/anular')
+    expect(data.canModify).toBe(true)
+    expect(data.modifyDeadline).toMatch(/^las \d{2}:\d{2}( del .+)? \(4 horas antes de tu sesión\)$/)
+  })
+
+  it('US-102: canModify is false once the deadline passed', () => {
+    const apt = { ...APPOINTMENT, tokenExpiresAt: new Date(Date.now() - 60_000) } as AppointmentWithService
+    expect(buildAppointmentReminderData(apt, PROFESSIONAL, 'same_day').canModify).toBe(false)
+  })
+
+  it('US-102: no change/cancel links for appointments without token (manual from the panel)', () => {
+    const apt = { ...APPOINTMENT, appointmentToken: null } as unknown as AppointmentWithService
+    expect(buildAppointmentReminderData(apt, PROFESSIONAL, 'day_before').modifyUrl).toBeUndefined()
   })
 
   it('builds the confirm-attendance link from PUBLIC_API_URL and the appointment token', () => {

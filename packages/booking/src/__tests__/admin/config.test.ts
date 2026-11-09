@@ -75,6 +75,39 @@ describe('GET /api/admin/config', () => {
 })
 
 describe('PATCH /api/admin/config', () => {
+  it('US-092: changing modifyDeadlineHours recomputes the link deadline of future appointments', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, modifyDeadlineHours: 4 })
+    prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, modifyDeadlineHours: 6 })
+    prismaMock.$executeRaw.mockResolvedValue(3)
+    const res = await request(app)
+      .patch('/api/admin/config')
+      .set('Cookie', `auth_token=${token()}`)
+      .send({ modifyDeadlineHours: 6 })
+    expect(res.status).toBe(200)
+    expect(res.body.data.modifyDeadlineHours).toBe(6)
+    expect(prismaMock.$executeRaw).toHaveBeenCalledTimes(1)
+    expect(prismaMock.$executeRaw.mock.calls[0]).toContain(6)
+  })
+
+  it('US-092: does not touch appointments when modifyDeadlineHours is unchanged or not sent', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue({ ...PROFESSIONAL, modifyDeadlineHours: 4 })
+    prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, modifyDeadlineHours: 4 })
+    await request(app).patch('/api/admin/config').set('Cookie', `auth_token=${token()}`).send({ modifyDeadlineHours: 4 })
+    await request(app).patch('/api/admin/config').set('Cookie', `auth_token=${token()}`).send({ bookingWindowWeeks: 8 })
+    expect(prismaMock.$executeRaw).not.toHaveBeenCalled()
+  })
+
+  it('US-092: rejects an out-of-range modifyDeadlineHours', async () => {
+    const res = await request(app).patch('/api/admin/config').set('Cookie', `auth_token=${token()}`).send({ modifyDeadlineHours: 100 })
+    expect(res.status).toBe(400)
+  })
+
+  it('US-092: defaults modifyDeadlineHours to 4', async () => {
+    prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
+    const res = await request(app).get('/api/admin/config').set('Cookie', `auth_token=${token()}`)
+    expect(res.body.data.modifyDeadlineHours).toBe(4)
+  })
+
   it('updates config fields', async () => {
     prismaMock.professional.findUnique.mockResolvedValue(PROFESSIONAL)
     prismaMock.professional.update.mockResolvedValue({ ...PROFESSIONAL, bookingWindowWeeks: 8 })

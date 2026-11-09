@@ -15,7 +15,8 @@ import {
   type AppointmentWithService,
 } from '../lib/notification-data.js'
 import { getEmailService } from '../lib/email-service.js'
-import { dateKeyInTZ, dayRangeInTZ } from '../lib/date.js'
+import { calculateTokenExpiry, DEFAULT_MODIFY_DEADLINE_HOURS } from '../lib/modify-deadline.js'
+import { dateKeyInTZ } from '../lib/date.js'
 import { ensureGoogleMeetEvent, cancelGoogleMeetEventForAppointment } from '../lib/google-meet.js'
 import type { Appointment, Service } from '../generated/prisma/index.js'
 
@@ -74,9 +75,6 @@ function isSameCalendarDay(a: Date, b: Date, timezone: string): boolean {
   return dateKeyInTZ(a, timezone) === dateKeyInTZ(b, timezone)
 }
 
-/** Citas agendadas para el mismo día: se pueden modificar/anular hasta 3 horas antes. */
-const SAME_DAY_MODIFY_HOURS = 3
-
 function generateToken(): string {
   // Es la única credencial para cancelar/reagendar una cita sin login vía link
   // público — debe ser criptográficamente segura, no adivinable.
@@ -100,19 +98,15 @@ async function resolveSurveyOptIn(clientEmail: string, requested: boolean, keepO
   return true
 }
 
-async function professionalTimezone(professionalId: string): Promise<string> {
-  const professional = await prisma.professional.findUnique({ where: { id: professionalId }, select: { timezone: true } })
-  return professional?.timezone ?? 'America/Santiago'
-}
-
-/** Plazo para modificar/anular por enlace: 23:00 (hora de la profesional) del día anterior a la
- * cita; si la cita es para el mismo día en que se agenda/reagenda, hasta 3 horas antes. */
-function calculateTokenExpiry(startDateTime: Date, timezone: string, now: Date = new Date()): Date {
-  if (isSameCalendarDay(startDateTime, now, timezone)) {
-    return new Date(startDateTime.getTime() - SAME_DAY_MODIFY_HOURS * 60 * 60 * 1000)
+async function professionalSettings(professionalId: string): Promise<{ timezone: string; modifyDeadlineHours: number }> {
+  const professional = await prisma.professional.findUnique({
+    where: { id: professionalId },
+    select: { timezone: true, modifyDeadlineHours: true },
+  })
+  return {
+    timezone: professional?.timezone ?? 'America/Santiago',
+    modifyDeadlineHours: professional?.modifyDeadlineHours ?? DEFAULT_MODIFY_DEADLINE_HOURS,
   }
-  const { gte: startOfSessionDay } = dayRangeInTZ(dateKeyInTZ(startDateTime, timezone), timezone)
-  return new Date(startOfSessionDay.getTime() - 60 * 60 * 1000)
 }
 
 export async function createAppointment(req: Request, res: Response): Promise<void> {
@@ -136,7 +130,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
   const start = new Date(startDateTime)
   const end = new Date(start.getTime() + service.duration * 60_000)
   const now = new Date()
-  const timezone = await professionalTimezone(professionalId)
+  const { timezone, modifyDeadlineHours } = await professionalSettings(professionalId)
   const bookingFlow = isSameCalendarDay(start, now, timezone) ? 'same_day' : 'advance'
   const paymentDeadline = bookingFlow === 'same_day'
     ? end
@@ -144,7 +138,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
 
   const isCash = paymentMethod === 'cash'
   const appointmentToken = generateToken()
-  const tokenExpiresAt = calculateTokenExpiry(start, timezone, now)
+  const tokenExpiresAt = calculateTokenExpiry(start, modifyDeadlineHours)
 
   try {
     const appointment = await runSerializable(async (tx) => {
@@ -371,7 +365,7 @@ export async function rescheduleAppointment(
   const newStart = options.newStart
   const newEnd = new Date(newStart.getTime() + service.duration * 60_000)
 
-  const timezone = await professionalTimezone(originalAppointment.professionalId)
+  const { modifyDeadlineHours } = await professionalSettings(originalAppointment.professionalId)
   const newAppointment = await runSerializable(async (tx) => {
     const conflict = await tx.appointment.findFirst({
       where: {
@@ -401,7 +395,7 @@ export async function rescheduleAppointment(
         paymentMethod: originalAppointment.paymentMethod,
         bookingFlow: 'advance',
         appointmentToken: generateToken(),
-        tokenExpiresAt: calculateTokenExpiry(newStart, timezone),
+        tokenExpiresAt: calculateTokenExpiry(newStart, modifyDeadlineHours),
         // Reagendar no cambia lo que la paciente eligió sobre la encuesta (US-099).
         surveyOptIn: originalAppointment.surveyOptIn,
       },

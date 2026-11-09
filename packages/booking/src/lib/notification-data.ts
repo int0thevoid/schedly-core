@@ -99,14 +99,17 @@ function canModifyByLink(tokenExpiresAt: Date | null | undefined): boolean {
   return Boolean(tokenExpiresAt) && (tokenExpiresAt as Date) > new Date()
 }
 
-/** Texto del plazo para el correo: "23:00 del día anterior" o, si vence el mismo día de la cita
- * (agendada para el mismo día), la hora exacta. */
+/** Texto del plazo para el correo (US-092): "las 11:00 (4 horas antes de tu sesión)"; si el plazo
+ * cae el día anterior a la cita, se agrega la fecha. */
 function modifyDeadlineText(appointment: AppointmentWithService, timezone: string): string | undefined {
   const expires = appointment.tokenExpiresAt
   if (!expires) return undefined
+  const hours = Math.round((appointment.startDateTime.getTime() - expires.getTime()) / (60 * 60 * 1000))
+  const before = hours === 1 ? '1 hora antes de tu sesión' : `${hours} horas antes de tu sesión`
   const sameDay = expires.toLocaleDateString('en-CA', { timeZone: timezone }) ===
     appointment.startDateTime.toLocaleDateString('en-CA', { timeZone: timezone })
-  return sameDay ? `las ${formatAppointmentTime(expires, timezone)} (3 horas antes de tu sesión)` : undefined
+  const time = formatAppointmentTime(expires, timezone)
+  return sameDay ? `las ${time} (${before})` : `las ${time} del ${formatAppointmentDate(expires, timezone).toLowerCase()} (${before})`
 }
 
 export function buildAppointmentConfirmationData(
@@ -161,6 +164,14 @@ export function buildAppointmentReminderData(
     price: appointment.service.price,
     transferData: buildTransferData(professional),
     confirmAttendanceUrl: buildConfirmAttendanceUrl(appointment.appointmentToken),
+    ...(appointment.appointmentToken
+      ? {
+          modifyUrl: buildTokenUrl(appointment.appointmentToken, 'modificar'),
+          cancelUrl: buildTokenUrl(appointment.appointmentToken, 'anular'),
+          canModify: canModifyByLink(appointment.tokenExpiresAt),
+          modifyDeadline: modifyDeadlineText(appointment, professional.timezone),
+        }
+      : {}),
   }
 }
 
