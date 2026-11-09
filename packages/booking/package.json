@@ -11,7 +11,8 @@
     "build": "tsc",
     "test": "vitest run",
     "lint": "tsc --noEmit",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "admin-user": "tsx prisma/create-admin-user.ts"
   },
   "prisma": {
     "seed": "pnpm seed"

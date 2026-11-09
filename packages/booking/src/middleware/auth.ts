@@ -8,6 +8,7 @@ export const AUTH_COOKIE_NAME = 'auth_token'
 interface AdminJwtPayload {
   professionalId: string
   role: string
+  adminUserId?: string
 }
 
 function isAdminJwtPayload(payload: unknown): payload is AdminJwtPayload {
@@ -33,7 +34,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
       return
     }
     req.professionalId = payload.professionalId
-    setAuditAdmin(payload.professionalId)
+    req.adminUserId = typeof payload.adminUserId === 'string' ? payload.adminUserId : undefined
+    setAuditAdmin(payload.professionalId, req.adminUserId)
     next()
   } catch {
     fail(res, 'Invalid token', 401)

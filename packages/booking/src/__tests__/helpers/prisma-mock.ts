@@ -71,6 +71,10 @@ export const prismaMock = {
     update: vi.fn(),
     delete: vi.fn(),
   },
+  adminUser: {
+    findUnique: vi.fn(),
+    update: vi.fn(),
+  },
   auditLog: {
     findMany: vi.fn(),
     create: vi.fn(),
