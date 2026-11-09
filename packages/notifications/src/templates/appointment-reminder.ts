@@ -23,6 +23,25 @@ export interface AppointmentReminderData {
   transferData: TransferData
   /** Link público (por token) para confirmar asistencia; sin él no se muestra el botón. */
   confirmAttendanceUrl?: string
+  /** US-102: enlaces para cambiar/anular la hora (solo si el plazo sigue abierto). */
+  modifyUrl?: string
+  cancelUrl?: string
+  canModify?: boolean
+  /** Hasta cuándo se puede modificar/anular (ej. "las 11:00 (4 horas antes de tu sesión)"). */
+  modifyDeadline?: string
+}
+
+/** US-102: el recordatorio es el correo que la paciente mira cerca de la sesión; si el plazo sigue
+ * abierto, incluye cómo cambiar o anular la hora sin escribir por WhatsApp. */
+function renderModifyLinks(data: AppointmentReminderData): string {
+  if (!data.canModify || !data.modifyUrl || !data.cancelUrl) return ''
+  const deadline = data.modifyDeadline ? ` Puedes hacerlo hasta <strong>${escapeHtml(data.modifyDeadline)}</strong>.` : ''
+  return `
+    <div style="border:1px solid ${COLORS.border};border-radius:8px;padding:16px;margin-bottom:24px;text-align:center;">
+      <p style="margin:0 0 8px;font-size:14px;color:${COLORS.muted};">¿Necesitas cambiar o anular tu hora?${deadline}</p>
+      <a href="${escapeHtml(data.modifyUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.primary};text-decoration:none;font-weight:600;font-size:14px;padding:8px 16px;border-radius:8px;margin:4px;border:1px solid ${COLORS.primary};">✏️ Cambiar hora</a>
+      <a href="${escapeHtml(data.cancelUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.accent};text-decoration:none;font-weight:600;font-size:14px;padding:8px 16px;border-radius:8px;margin:4px;border:1px solid ${COLORS.accent};">❌ Anular</a>
+    </div>`
 }
 
 function renderLocation(data: AppointmentReminderData): string {
@@ -80,6 +99,8 @@ export function appointmentReminderTemplate(data: AppointmentReminderData): Emai
     <p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Llega / conéctate unos minutos antes para comenzar puntual.</p>
 
     ${data.confirmAttendanceUrl ? `<div style="margin-bottom:24px;">${confirmAttendanceButton(data.confirmAttendanceUrl)}</div>` : ''}
+
+    ${renderModifyLinks(data)}
 
     ${hasRealCalendarInvite(data) ? '' : `<div style="text-align:center;margin-bottom:${data.paymentStatus === 'unpaid' ? '24px' : '0'};">
       <a href="${escapeHtml(data.googleCalendarUrl)}" style="display:inline-block;background-color:#fff;color:${COLORS.primary};text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;border:1px solid ${COLORS.primary};">📅 Agregar a Google Calendar</a>
