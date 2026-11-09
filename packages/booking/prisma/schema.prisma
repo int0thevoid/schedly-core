@@ -37,6 +37,9 @@ model Professional {
 
   cashPaymentEnabled Boolean @default(true)
 
+  // US-092: horas antes de la cita hasta las que la paciente puede modificar/anular por enlace.
+  modifyDeadlineHours Int @default(4)
+
   services         Service[]
   weeklySchedules  WeeklySchedule[]
   scheduleBlocks   ScheduleBlock[]

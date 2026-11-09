@@ -68,6 +68,7 @@ export const prismaMock = {
     create: vi.fn(),
   },
   $transaction: vi.fn(),
+  $executeRaw: vi.fn(),
 }
 
 export function resetMocks() {
@@ -81,4 +82,5 @@ export function resetMocks() {
   if (typeof prismaMock.$transaction === 'function' && 'mockReset' in prismaMock.$transaction) {
     prismaMock.$transaction.mockReset()
   }
+  prismaMock.$executeRaw.mockReset()
 }

@@ -18,7 +18,7 @@ export interface AppointmentModifiedData {
   cancelUrl: string
   /** false si el plazo para modificar/anular por enlace ya venció (cita para el mismo día). */
   canModify?: boolean
-  /** Plazo cuando no es el estándar "23:00 del día anterior" (ej. "las 12:00 (3 horas antes de tu sesión)"). */
+  /** Hasta cuándo se puede modificar/anular por enlace (ej. "las 11:00 (4 horas antes de tu sesión)"). */
   modifyDeadline?: string
   googleCalendarUrl: string
   newStartDateTime: Date
@@ -87,7 +87,7 @@ export function appointmentModifiedTemplate(data: AppointmentModifiedData): Emai
 
     ${renderLocation(data)}
 
-    ${renderModifyNote(data, `<p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Puedes modificar o anular tu nueva cita hasta las <strong>23:00 del día anterior</strong>.</p>`)}
+    ${renderModifyNote(data, `<p style="margin:0 0 24px;font-size:14px;color:${COLORS.muted};">Puedes modificar o anular tu nueva cita desde los botones de este correo hasta unas horas antes de tu sesión.</p>`)}
 
     ${data.canModify === false ? '' : `<div style="margin:0 0 12px;text-align:center;">
       <a href="${escapeHtml(data.modifyUrl)}" style="display:inline-block;background-color:${COLORS.primary};color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;margin:4px;">✏️ Modificar cita</a>

@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
+import { DEFAULT_MODIFY_DEADLINE_HOURS, recomputeFutureTokenExpiry } from '../../lib/modify-deadline.js'
 
 const updateSchema = z.object({
   bookingWindowWeeks: z.number().int().min(1).max(52).optional(),
@@ -13,6 +14,7 @@ const updateSchema = z.object({
   treatmentTypes: z.array(z.string().min(1)).optional(),
   dailyDigestTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'dailyDigestTime must be HH:MM').optional(),
   cashPaymentEnabled: z.boolean().optional(),
+  modifyDeadlineHours: z.number().int().min(0).max(72).optional(),
 })
 
 function serializeConfig(p: {
@@ -25,6 +27,7 @@ function serializeConfig(p: {
   treatmentTypes?: string[]
   dailyDigestTime?: string
   cashPaymentEnabled?: boolean
+  modifyDeadlineHours?: number
 }) {
   return {
     bookingWindowWeeks: p.bookingWindowWeeks,
@@ -36,6 +39,7 @@ function serializeConfig(p: {
     treatmentTypes: p.treatmentTypes ?? [],
     dailyDigestTime: p.dailyDigestTime ?? '16:00',
     cashPaymentEnabled: p.cashPaymentEnabled ?? true,
+    modifyDeadlineHours: p.modifyDeadlineHours ?? DEFAULT_MODIFY_DEADLINE_HOURS,
   }
 }
 
@@ -81,5 +85,8 @@ export async function updateConfig(req: Request, res: Response): Promise<void> {
     where: { id: professionalId },
     data: parsed.data,
   })
+  if (parsed.data.modifyDeadlineHours !== undefined && parsed.data.modifyDeadlineHours !== professional.modifyDeadlineHours) {
+    await recomputeFutureTokenExpiry(professionalId, parsed.data.modifyDeadlineHours)
+  }
   ok(res, serializeConfig(updated))
 }

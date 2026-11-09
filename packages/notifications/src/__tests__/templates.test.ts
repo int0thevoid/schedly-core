@@ -66,9 +66,10 @@ describe('appointmentConfirmationTemplate', () => {
     expect(html).toContain('Agregar a Google Calendar')
   })
 
-  it('includes modification deadline notice (23:00 del día anterior)', () => {
+  it('includes a generic modification notice when no deadline is given', () => {
     const { html } = appointmentConfirmationTemplate(baseData)
-    expect(html).toContain('23:00')
+    expect(html).toContain('hasta unas horas antes de tu sesión')
+    expect(html).not.toContain('23:00')
   })
 
   it('includes the professional phone in the footer', () => {
@@ -128,13 +129,13 @@ describe('appointmentConfirmationTemplate', () => {
     expect(html).not.toContain(baseData.modifyUrl)
     expect(html).not.toContain(baseData.cancelUrl)
     expect(html).toContain('Ya pasó el plazo')
-    expect(html).not.toContain('23:00 del día anterior')
+    expect(html).not.toContain('hasta unas horas antes')
   })
 
-  it('shows the exact deadline for same-day bookings', () => {
-    const { html } = appointmentConfirmationTemplate({ ...baseData, modifyDeadline: 'las 12:00 (3 horas antes de tu sesión)' })
-    expect(html).toContain('las 12:00 (3 horas antes de tu sesión)')
-    expect(html).not.toContain('23:00 del día anterior')
+  it('shows the exact deadline (US-092: N horas antes)', () => {
+    const { html } = appointmentConfirmationTemplate({ ...baseData, modifyDeadline: 'las 11:00 (4 horas antes de tu sesión)' })
+    expect(html).toContain('las 11:00 (4 horas antes de tu sesión)')
+    expect(html).not.toContain('hasta unas horas antes')
     expect(html).toContain(baseData.modifyUrl)
   })
 })
@@ -171,6 +172,32 @@ describe('appointmentReminderTemplate', () => {
   it('tells the client their session is in 2 hours cuando timing es same_day', () => {
     const { html } = appointmentReminderTemplate(baseData)
     expect(html).toContain('2 horas')
+  })
+
+  it('US-102: includes change/cancel links and the deadline while the link is still valid', () => {
+    const { html } = appointmentReminderTemplate({
+      ...baseData,
+      timing: 'day_before',
+      modifyUrl: 'https://agenda.example.com/cita/tok/modificar',
+      cancelUrl: 'https://agenda.example.com/cita/tok/anular',
+      canModify: true,
+      modifyDeadline: 'las 10:00 (4 horas antes de tu sesión)',
+    })
+    expect(html).toContain('¿Necesitas cambiar o anular tu hora?')
+    expect(html).toContain('https://agenda.example.com/cita/tok/modificar')
+    expect(html).toContain('https://agenda.example.com/cita/tok/anular')
+    expect(html).toContain('las 10:00 (4 horas antes de tu sesión)')
+  })
+
+  it('US-102: omits change/cancel links once the deadline passed or without links', () => {
+    const expired = appointmentReminderTemplate({
+      ...baseData,
+      modifyUrl: 'https://agenda.example.com/cita/tok/modificar',
+      cancelUrl: 'https://agenda.example.com/cita/tok/anular',
+      canModify: false,
+    })
+    expect(expired.html).not.toContain('/cita/tok/modificar')
+    expect(appointmentReminderTemplate(baseData).html).not.toContain('¿Necesitas cambiar o anular tu hora?')
   })
 
   it('subject y copy cambian a "mañana" cuando timing es day_before', () => {
