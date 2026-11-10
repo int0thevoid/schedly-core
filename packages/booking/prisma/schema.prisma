@@ -45,6 +45,8 @@ model Professional {
   scheduleBlocks   ScheduleBlock[]
   appointments     Appointment[]
   consentDocuments ConsentDocument[]
+  products         Product[]
+  adminUsers       AdminUser[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -257,4 +259,46 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+// E22 (US-075/077): catálogo de la vitrina. Sin compra en la web: cada producto lleva a WhatsApp
+// o a su enlace propio (externalUrl).
+model Product {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+
+  slug        String    @unique
+  type        String // 'ebook' | 'toy' | 'workshop'
+  name        String
+  summary     String
+  description String    @default("")
+  // 0 = gratis
+  price       Int       @default(0)
+  // Data URL de la foto, igual que Professional.photoUrl (el filesystem no persiste entre deploys).
+  imageData   String?
+  externalUrl String?
+  // Solo talleres
+  eventDate   DateTime?
+  isPublished Boolean   @default(false)
+  position    Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([professionalId, isPublished, position])
+}
+
+// Cuentas adicionales del panel (además de la de la profesional, que entra con Professional.email).
+// Entran al mismo panel con los mismos permisos; el historial guarda su id como actorId.
+model AdminUser {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  email          String       @unique
+  name           String
+  passwordHash   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

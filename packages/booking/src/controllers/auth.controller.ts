@@ -30,6 +30,21 @@ function authCookieOptions(): CookieOptions {
   }
 }
 
+interface Account {
+  professionalId: string
+  adminUserId?: string
+  passwordHash: string | null
+}
+
+/** La profesional entra con su correo; las cuentas adicionales del panel (AdminUser), con el suyo. */
+async function findAccount(email: string): Promise<Account | null> {
+  const professional = await prisma.professional.findUnique({ where: { email } })
+  if (professional) return { professionalId: professional.id, passwordHash: professional.passwordHash }
+  const adminUser = await prisma.adminUser.findUnique({ where: { email: email.toLowerCase() } })
+  if (adminUser) return { professionalId: adminUser.professionalId, adminUserId: adminUser.id, passwordHash: adminUser.passwordHash }
+  return null
+}
+
 export async function login(req: Request, res: Response): Promise<void> {
   const parsed = loginSchema.safeParse(req.body)
   if (!parsed.success) {
@@ -38,15 +53,15 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   const { email, password } = parsed.data
-  const professional = await prisma.professional.findUnique({ where: { email } })
+  const account = await findAccount(email)
 
   // Same error message for missing user and wrong password — prevents user enumeration
-  if (!professional?.passwordHash || !(await bcrypt.compare(password, professional.passwordHash))) {
+  if (!account?.passwordHash || !(await bcrypt.compare(password, account.passwordHash))) {
     await recordAuditEvent({
       action: 'login_failed',
       entity: 'Auth',
-      entityId: professional?.id ?? null,
-      professionalId: professional?.id ?? null,
+      entityId: account?.adminUserId ?? account?.professionalId ?? null,
+      professionalId: account?.professionalId ?? null,
       changes: { email },
     })
     fail(res, 'Credenciales incorrectas', 401)
@@ -55,13 +70,13 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   const secret = process.env.JWT_SECRET ?? 'dev-secret'
   const token = jwt.sign(
-    { professionalId: professional.id, role: 'admin' },
+    { professionalId: account.professionalId, role: 'admin', ...(account.adminUserId ? { adminUserId: account.adminUserId } : {}) },
     secret,
     { expiresIn: '8h' },
   )
 
-  setAuditAdmin(professional.id)
-  await recordAuditEvent({ action: 'login_succeeded', entity: 'Auth', entityId: professional.id, changes: { email } })
+  setAuditAdmin(account.professionalId, account.adminUserId)
+  await recordAuditEvent({ action: 'login_succeeded', entity: 'Auth', entityId: account.adminUserId ?? account.professionalId, changes: { email } })
 
   res.cookie(AUTH_COOKIE_NAME, token, { ...authCookieOptions(), maxAge: SESSION_MS })
   ok(res, { success: true })
