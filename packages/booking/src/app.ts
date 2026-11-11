@@ -27,6 +27,10 @@ import reviewsRouter from './routes/reviews.js'
 import adminReviewsRouter from './routes/admin/reviews.js'
 import productsRouter from './routes/products.js'
 import adminProductsRouter from './routes/admin/products.js'
+import serviceCategoriesRouter from './routes/service-categories.js'
+import siteContentRouter from './routes/site-content.js'
+import adminServiceCategoriesRouter from './routes/admin/serviceCategories.js'
+import adminSiteContentRouter from './routes/admin/siteContent.js'
 import { getTransferConfig } from './controllers/admin/transfer.controller.js'
 import { getPublicConfig } from './controllers/admin/config.controller.js'
 import { getPublicProfessionalPhoto } from './controllers/admin/professional.controller.js'
@@ -101,6 +105,8 @@ app.use('/api/appointments', appointmentsRouter)
 app.use('/api/clients', clientsRouter)
 app.use('/api/reviews', reviewsRouter)
 app.use('/api/products', productsRouter)
+app.use('/api/service-categories', serviceCategoriesRouter)
+app.use('/api/site-content', siteContentRouter)
 
 // Public: booking wizard needs these without auth
 app.get('/api/config', getPublicConfig)
@@ -125,6 +131,8 @@ app.use('/api/admin/finance', adminFinanceRouter)
 app.use('/api/admin/audit', adminAuditRouter)
 app.use('/api/admin/reviews', adminReviewsRouter)
 app.use('/api/admin/products', adminProductsRouter)
+app.use('/api/admin/service-categories', adminServiceCategoriesRouter)
+app.use('/api/admin/site-content', adminSiteContentRouter)
 app.get('/api/admin/availability', getAdminDayAvailability)
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

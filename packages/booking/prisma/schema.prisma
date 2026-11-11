@@ -40,13 +40,15 @@ model Professional {
   // US-092: horas antes de la cita hasta las que la paciente puede modificar/anular por enlace.
   modifyDeadlineHours Int @default(4)
 
-  services         Service[]
-  weeklySchedules  WeeklySchedule[]
-  scheduleBlocks   ScheduleBlock[]
-  appointments     Appointment[]
-  consentDocuments ConsentDocument[]
-  products         Product[]
-  adminUsers       AdminUser[]
+  services          Service[]
+  serviceCategories ServiceCategory[]
+  siteContents      SiteContent[]
+  weeklySchedules   WeeklySchedule[]
+  scheduleBlocks    ScheduleBlock[]
+  appointments      Appointment[]
+  consentDocuments  ConsentDocument[]
+  products          Product[]
+  adminUsers        AdminUser[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -62,8 +64,12 @@ model Service {
   modality       String
   bufferMinutes  Int?
   isActive       Boolean @default(true)
+  // Agrupación opcional en el sitio público (ej. Color, Uñas). Sin categoría = grupo "Otros".
+  categoryId     String?
+  position       Int     @default(0)
 
-  professional Professional @relation(fields: [professionalId], references: [id])
+  professional Professional     @relation(fields: [professionalId], references: [id])
+  category     ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   appointments Appointment[]
 
   createdAt DateTime @default(now())
@@ -117,13 +123,13 @@ model Appointment {
   googleEventId String?
   meetLink      String?
 
-  paymentStatus  String  @default("unpaid")
-  paymentAmount  Int?
-  paymentMethod  String?
+  paymentStatus String  @default("unpaid")
+  paymentAmount Int?
+  paymentMethod String?
 
-  bookingFlow      String    @default("advance")
-  paymentDeadline  DateTime?
-  autoCancelledAt  DateTime?
+  bookingFlow     String    @default("advance")
+  paymentDeadline DateTime?
+  autoCancelledAt DateTime?
 
   // Registro de citas canceladas (US-088): cuándo, quién (patient | admin | rescheduled) y, si se
   // reagendó, el id de la cita nueva.
@@ -201,28 +207,28 @@ model Client {
 // Reseñas de pacientes (US-072/073/097). Las del sitio quedan ligadas a la sesión evaluada y a la
 // paciente (trazabilidad); las importadas (Agify, Google) solo traen su id externo.
 model Review {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   professionalId String
   // web | agify | google
-  source         String   @default("web")
+  source         String    @default("web")
   externalId     String?
-  appointmentId  String?  @unique
+  appointmentId  String?   @unique
   clientId       String?
   rating         Int
   comment        String?
-  isAnonymous    Boolean  @default(false)
+  isAnonymous    Boolean   @default(false)
   // Nombre que se muestra (lo escribe la paciente; en importadas, iniciales). Null si es anónima.
   displayName    String?
   // El nombre escrito no coincide con el de la paciente: Stefany debe verificarlo antes de aprobar.
-  nameMismatch   Boolean  @default(false)
+  nameMismatch   Boolean   @default(false)
   // pending | approved | rejected
-  status         String   @default("pending")
+  status         String    @default("pending")
   moderatedAt    DateTime?
   publicReply    String?
   repliedAt      DateTime?
   serviceName    String?
   // Fecha de la reseña (en importadas, la original de la plataforma).
-  reviewedAt     DateTime @default(now())
+  reviewedAt     DateTime  @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -301,4 +307,32 @@ model AdminUser {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Grupos de servicios administrables desde el panel (ej. "Color", "Corte", "Uñas").
+model ServiceCategory {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  name           String
+  description    String       @default("")
+  position       Int          @default(0)
+  services       Service[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([professionalId, position])
+}
+
+// Textos editables del sitio público, por bloque (ej. "about", "brand-partner").
+// El frontend define la forma de cada bloque y usa sus propios valores por defecto si no existe.
+model SiteContent {
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  key            String
+  value          Json
+  updatedAt      DateTime     @updatedAt
+
+  @@id([professionalId, key])
 }

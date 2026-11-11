@@ -1,6 +1,18 @@
 import { vi } from 'vitest'
 
 export const prismaMock = {
+  serviceCategory: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+  siteContent: {
+    findMany: vi.fn(),
+    upsert: vi.fn(),
+  },
   service: {
     findMany: vi.fn(),
     findUnique: vi.fn(),

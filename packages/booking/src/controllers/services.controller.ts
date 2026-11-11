@@ -20,7 +20,7 @@ export async function listServices(req: Request, res: Response): Promise<void> {
       isActive: true,
       ...(parsed.data.modality ? { modality: parsed.data.modality } : {}),
     },
-    orderBy: { name: 'asc' },
+    orderBy: [{ position: 'asc' }, { name: 'asc' }],
   })
   ok(res, services)
 }

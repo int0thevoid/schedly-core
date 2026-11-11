@@ -11,6 +11,8 @@ const serviceBodySchema = z.object({
   modality: z.enum(['presential', 'online', 'both']),
   bufferMinutes: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
+  categoryId: z.string().min(1).nullable().optional(),
+  position: z.number().int().min(0).optional(),
 })
 
 const updateBodySchema = serviceBodySchema.partial()
@@ -19,11 +21,17 @@ const toggleSchema = z.object({
   isActive: z.boolean(),
 })
 
+// The category must belong to the same professional (null/undefined = no change check needed).
+async function categoryIsValid(categoryId: string | null | undefined, professionalId: string): Promise<boolean> {
+  if (!categoryId) return true
+  return (await prisma.serviceCategory.findFirst({ where: { id: categoryId, professionalId } })) !== null
+}
+
 export async function listAdminServices(req: Request, res: Response): Promise<void> {
   const professionalId = req.professionalId ?? ''
   const services = await prisma.service.findMany({
     where: { professionalId },
-    orderBy: { name: 'asc' },
+    orderBy: [{ position: 'asc' }, { name: 'asc' }],
   })
   ok(res, services)
 }
@@ -35,6 +43,10 @@ export async function createService(req: Request, res: Response): Promise<void> 
     return
   }
   const professionalId = req.professionalId ?? ''
+  if (!(await categoryIsValid(parsed.data.categoryId, professionalId))) {
+    fail(res, 'Category not found', 400)
+    return
+  }
   const service = await prisma.service.create({
     data: {
       professionalId,
@@ -55,6 +67,10 @@ export async function updateService(req: Request, res: Response): Promise<void> 
   const existing = await prisma.service.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!existing) {
     fail(res, 'Service not found', 404)
+    return
+  }
+  if (!(await categoryIsValid(parsed.data.categoryId, req.professionalId ?? ''))) {
+    fail(res, 'Category not found', 400)
     return
   }
   const service = await prisma.service.update({
