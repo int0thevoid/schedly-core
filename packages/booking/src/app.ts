@@ -87,7 +87,7 @@ const loginLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Too many login attempts, please try again later' },
+  message: { success: false, error: 'Demasiados intentos de inicio de sesión. Espera 15 minutos e intenta de nuevo.' },
 })
 // The API host has no page of its own: Google found its root (404) through the photo URL and
 // reported it in Search Console. Send visitors and crawlers to the site instead.
