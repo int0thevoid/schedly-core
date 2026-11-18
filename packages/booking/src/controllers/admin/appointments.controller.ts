@@ -291,7 +291,7 @@ export async function updateAppointmentPayment(req: Request, res: Response): Pro
         }
       : { paymentStatus: 'unpaid', paymentAmount: null, paymentMethod: null }
 
-  const updated = await prisma.appointment.update({ where: { id }, data })
+  const updated = await prisma.appointment.update({ where: { id }, data, include: { service: true } })
   ok(res, updated)
 }
 
@@ -310,6 +310,7 @@ export async function updateAppointmentAttendance(req: Request, res: Response): 
   const updated = await prisma.appointment.update({
     where: { id },
     data: { attended: parsed.data.attended },
+    include: { service: true },
   })
   ok(res, updated)
 }
@@ -329,6 +330,7 @@ export async function updateAppointmentOutcome(req: Request, res: Response): Pro
   const updated = await prisma.appointment.update({
     where: { id },
     data: { outcome: parsed.data.outcome },
+    include: { service: true },
   })
   // US-100: al marcar "Asistió" se envía la encuesta si corresponde (check al agendar, sin baja,
   // máximo 1 vez al mes). El resultado le dice al panel si salió o por qué no.

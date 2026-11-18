@@ -58,6 +58,30 @@ describe('POST /api/appointments', () => {
     expect(res.body.success).toBe(true)
   })
 
+  it('un servicio solo online guarda la cita como online aunque llegue "presential"', async () => {
+    prismaMock.service.findUnique.mockResolvedValue(SERVICE)
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+    await request(app).post('/api/appointments').send({ ...VALID_BODY, modality: 'presential' })
+    expect(prismaMock.appointment.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ modality: 'online' }) }),
+    )
+  })
+
+  it('un servicio "both" respeta la modalidad elegida', async () => {
+    prismaMock.service.findUnique.mockResolvedValue({ ...SERVICE, modality: 'both' })
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+    prismaMock.appointment.findFirst.mockResolvedValue(null)
+    prismaMock.appointment.create.mockResolvedValue(APPOINTMENT)
+
+    await request(app).post('/api/appointments').send({ ...VALID_BODY, modality: 'presential' })
+    expect(prismaMock.appointment.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ modality: 'presential' }) }),
+    )
+  })
+
   it('returns 409 when slot is taken', async () => {
     prismaMock.service.findUnique.mockResolvedValue(SERVICE)
     prismaMock.$transaction.mockRejectedValue(new Error('SLOT_TAKEN'))
