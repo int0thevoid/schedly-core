@@ -17,6 +17,7 @@ import {
 import { getEmailService } from '../lib/email-service.js'
 import { calculateTokenExpiry, DEFAULT_MODIFY_DEADLINE_HOURS } from '../lib/modify-deadline.js'
 import { dateKeyInTZ } from '../lib/date.js'
+import { resolveModality } from '../lib/modality.js'
 import { ensureGoogleMeetEvent, cancelGoogleMeetEventForAppointment } from '../lib/google-meet.js'
 import type { Appointment, Service } from '../generated/prisma/index.js'
 
@@ -169,7 +170,7 @@ export async function createAppointment(req: Request, res: Response): Promise<vo
           clientPhone,
           startDateTime: start,
           endDateTime: end,
-          modality,
+          modality: resolveModality(service.modality, modality),
           notes,
           status: isCash ? 'confirmed' : 'pending',
           paymentStatus: isCash ? 'paid' : 'unpaid',
@@ -387,7 +388,7 @@ export async function rescheduleAppointment(
         clientPhone: options.clientPhone ?? originalAppointment.clientPhone,
         startDateTime: newStart,
         endDateTime: newEnd,
-        modality: options.modality ?? originalAppointment.modality,
+        modality: resolveModality(service.modality, options.modality ?? originalAppointment.modality),
         notes: options.notes !== undefined ? options.notes : originalAppointment.notes,
         status: options.status,
         paymentStatus: originalAppointment.paymentStatus,

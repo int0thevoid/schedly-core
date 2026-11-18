@@ -600,6 +600,7 @@ describe('PATCH /api/admin/appointments/:id/outcome', () => {
     expect(prismaMock.appointment.update).toHaveBeenCalledWith({
       where: { id: 'a1' },
       data: { outcome: 'attended' },
+      include: { service: true },
     })
   })
 
@@ -616,6 +617,7 @@ describe('PATCH /api/admin/appointments/:id/outcome', () => {
     expect(prismaMock.appointment.update).toHaveBeenCalledWith({
       where: { id: 'a1' },
       data: { outcome: null },
+      include: { service: true },
     })
   })
 
