@@ -8,10 +8,12 @@ import { cancelGoogleMeetEventForAppointment, ensureGoogleMeetEvent, ensureGoogl
 import {
   buildAppointmentCancelledByPatientData,
   buildAppointmentConfirmationData,
+  buildAppointmentModifiedData,
   type AppointmentWithService,
 } from '../../lib/notification-data.js'
 import { addDaysToDateStr, dateKeyInTZ, dayRangeInTZ, todayInTZ } from '../../lib/date.js'
 import { isSlotTakenError, rescheduleAppointment } from '../appointments.controller.js'
+import { resolveModality } from '../../lib/modality.js'
 
 const TZ = 'America/Santiago'
 
@@ -447,6 +449,28 @@ export async function rescheduleAdminAppointment(req: Request, res: Response): P
     service = found
   }
 
+  // "Modificar cita" sin cambiar fecha, hora ni servicio: se edita la misma cita (sin crear otra ni
+  // anular la original). Solo se avisa a la paciente si cambió la modalidad (dirección vs. link).
+  const newStart = new Date(newStartDateTime)
+  if (newStart.getTime() === original.startDateTime.getTime() && service.id === original.serviceId) {
+    const newModality = resolveModality(service.modality, modality ?? original.modality)
+    const modalityChanged = newModality !== original.modality
+    const updated = await prisma.appointment.update({
+      where: { id },
+      data: {
+        modality: newModality,
+        ...(clientName !== undefined && { clientName }),
+        ...(clientPhone !== undefined && { clientPhone }),
+        ...(notes !== undefined && { notes }),
+        ...(modalityChanged && newModality === 'presential' && { meetLink: null, googleEventId: null }),
+      },
+      include: { service: true },
+    })
+    ok(res, updated)
+    if (modalityChanged) void notifyModalityChange(original, updated)
+    return
+  }
+
   try {
     const newAppointment = await rescheduleAppointment(original, {
       newStart: new Date(newStartDateTime),
@@ -465,5 +489,21 @@ export async function rescheduleAdminAppointment(req: Request, res: Response): P
       return
     }
     throw err
+  }
+}
+
+/** Aviso a la paciente cuando se cambia la modalidad de su cita sin moverla (Meet nuevo o anulado). */
+async function notifyModalityChange(original: AppointmentWithService, updated: AppointmentWithService): Promise<void> {
+  try {
+    if (updated.modality === 'presential') void cancelGoogleMeetEventForAppointment(original)
+    const professional = await prisma.professional.findUnique({ where: { id: updated.professionalId } })
+    if (!professional) return
+    const withMeet = { ...(await ensureGoogleMeetEvent(updated, updated.service, professional.name)), service: updated.service }
+    await getEmailService().sendAppointmentModified(
+      updated.clientEmail,
+      buildAppointmentModifiedData(original, withMeet, professional),
+    )
+  } catch (err) {
+    console.error(`[notifications] failed to notify modality change for appointment ${updated.id}`, err)
   }
 }
