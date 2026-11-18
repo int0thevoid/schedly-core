@@ -150,6 +150,32 @@ describe('reagendar desde el panel (US-090)', () => {
     expect((await rescheduleFromPanel()).status).toBe(409)
   })
 
+  it('misma fecha, hora y servicio: edita la misma cita, sin crear otra ni enviar correos', async () => {
+    prismaMock.appointment.update.mockResolvedValue({ ...PAID, notes: 'nota nueva', clientPhone: '+56900000000' })
+    const res = await rescheduleFromPanel({ newStartDateTime: '2026-10-08T22:00:00.000Z', notes: 'nota nueva', clientPhone: '+56900000000' })
+    expect(res.status).toBe(200)
+    expect(res.body.data.id).toBe('apt1')
+    expect(prismaMock.appointment.create).not.toHaveBeenCalled()
+    expect(prismaMock.appointment.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'apt1' },
+      data: expect.objectContaining({ notes: 'nota nueva', clientPhone: '+56900000000', modality: 'presential' }),
+    }))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(sendAppointmentModified).not.toHaveBeenCalled()
+    expect(sendProfessionalRescheduleNotice).not.toHaveBeenCalled()
+  })
+
+  it('misma hora pero cambia la modalidad: edita la misma cita y avisa a la paciente', async () => {
+    const both = { ...PAID, service: { ...SERVICE, modality: 'both' } }
+    prismaMock.appointment.findFirst.mockReset().mockResolvedValueOnce(both)
+    prismaMock.appointment.update.mockResolvedValue({ ...both, modality: 'online' })
+    const res = await rescheduleFromPanel({ newStartDateTime: '2026-10-08T22:00:00.000Z', modality: 'online' })
+    expect(res.status).toBe(200)
+    expect(prismaMock.appointment.create).not.toHaveBeenCalled()
+    expect(prismaMock.appointment.update.mock.calls[0][0].data).toMatchObject({ modality: 'online' })
+    await vi.waitFor(() => expect(sendAppointmentModified).toHaveBeenCalledWith('ana@test.com', expect.objectContaining({ modality: 'online' })))
+  })
+
   it('requiere sesión de administradora', async () => {
     const res = await request(app).post('/api/admin/appointments/apt1/reschedule').send({ newStartDateTime: '2026-10-10T19:00:00Z' })
     expect(res.status).toBe(401)
