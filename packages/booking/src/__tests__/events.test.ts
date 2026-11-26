@@ -17,6 +17,8 @@ import {
   eventPublishProblems,
   occupiesSeat,
   parseEventConfig,
+  publicAvailability,
+  publicEventConfig,
   registrationAvailability,
   statusFromPayments,
   validateAnswers,
@@ -272,5 +274,20 @@ describe('incomplete events (fix: convertir un taller publicado en evento)', () 
   it('an incomplete event shows «próximamente» and rejects registrations', () => {
     const incomplete = { ...CONFIG, paymentOptions: [] }
     expect(registrationAvailability(incomplete, 0, NOW, eventPublishProblems(incomplete, 180000).length === 0).status).toBe('not_started')
+  })
+})
+
+describe('publicAvailability (fix: mostrar «Quedan X cupos» solo con N o menos)', () => {
+  const open = (remaining: number | null) => ({ status: 'open' as const, remaining, capacity: 11, taken: 11 - (remaining ?? 0) })
+  it('hides the number unless N or fewer seats remain; never exposes capacity or taken', () => {
+    expect(publicAvailability(open(11), { showRemainingAt: 3 })).toEqual({ status: 'open', remaining: null, capacity: null, taken: null })
+    expect(publicAvailability(open(3), { showRemainingAt: 3 }).remaining).toBe(3)
+    expect(publicAvailability(open(1), { showRemainingAt: null }).remaining).toBeNull()
+    expect(publicAvailability(open(1), { showRemainingAt: 0 }).remaining).toBeNull()
+    expect(publicAvailability({ ...open(0), status: 'full' as const }, { showRemainingAt: 0 })).toMatchObject({ status: 'full', remaining: 0 })
+  })
+
+  it('public config never carries the total capacity', () => {
+    expect(publicEventConfig(CONFIG, NOW).capacity).toBeNull()
   })
 })

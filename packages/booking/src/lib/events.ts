@@ -108,6 +108,8 @@ export const eventConfigSchema = z.object({
   accentColor: z.union([z.string().regex(/^#[0-9a-fA-F]{6}$/), z.literal('')]).default(''),
 
   capacity: z.number().int().min(1).nullable().default(null),
+  /** La web muestra «Quedan X cupos» solo cuando quedan N o menos. null = nunca muestra el número. */
+  showRemainingAt: z.number().int().min(0).nullable().default(null),
   holdHours: z.number().int().min(1).max(24 * 14).default(24),
   registrationClosesAt: isoDate.nullable().default(null),
   waitlistEnabled: z.boolean().default(false),
@@ -382,9 +384,22 @@ export function formatAnswer(value: AnswerValue | undefined): string {
   return String(value)
 }
 
-/** Configuración visible en la web: sin el correo interno de avisos. */
+/** Configuración visible en la web: sin el correo interno de avisos ni el cupo total. */
 export function publicEventConfig(config: EventConfig, now: Date = new Date()) {
   const { emails, ...rest } = config
   void emails
-  return { ...rest, paymentOptions: availablePaymentOptions(config, now) }
+  return { ...rest, capacity: null, paymentOptions: availablePaymentOptions(config, now) }
+}
+
+/**
+ * Cupos que ve la web: el número de cupos libres solo cuando quedan N o menos (showRemainingAt);
+ * el cupo total y los ocupados nunca. El estado (abierto, agotado, lista de espera…) siempre.
+ */
+export function publicAvailability<T extends { status: RegistrationAvailability; remaining: number | null }>(
+  availability: T,
+  config: Pick<EventConfig, 'showRemainingAt'>,
+) {
+  const show =
+    availability.remaining !== null && config.showRemainingAt !== null && availability.remaining <= config.showRemainingAt
+  return { status: availability.status, remaining: show ? availability.remaining : null, capacity: null, taken: null }
 }
