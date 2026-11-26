@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import request from 'supertest'
+import jwt from 'jsonwebtoken'
 
 vi.mock('../lib/prisma.js', () => ({ prisma: prismaMock }))
 vi.mock('../lib/email-service.js', () => ({ getEmailService: () => emailMock }))
@@ -230,5 +231,46 @@ describe('POST /api/products/:slug/registrations', () => {
     prismaMock.eventRegistration.findFirst.mockResolvedValue({ id: 'x' })
     expect((await request(app).post('/api/products/retiro/registrations').send(body)).status).toBe(409)
     vi.useRealTimers()
+  })
+})
+
+describe('incomplete events (fix: convertir un taller publicado en evento)', () => {
+  const WORKSHOP = {
+    id: 'w1', professionalId: 'pro1', slug: 'retiro-femenino', type: 'workshop', name: 'Retiro', summary: 'S', description: '', price: 180000,
+    imageData: null, imageThumbData: null, externalUrl: null, eventDate: new Date('2027-01-22T15:00:00Z'), isPublished: true, position: 0,
+    eventConfig: null, createdAt: NOW, updatedAt: NOW,
+  }
+  const auth = () => `auth_token=${jwt.sign({ professionalId: 'pro1', role: 'admin' }, 'dev-secret')}`
+
+  beforeEach(() => {
+    resetMocks()
+    process.env.PROFESSIONAL_ID = 'pro1'
+    prismaMock.product.findFirst.mockResolvedValue(WORKSHOP)
+    prismaMock.product.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => ({ ...WORKSHOP, ...data }))
+  })
+
+  it('a published workshop becomes an event without unpublishing; the start date is kept', async () => {
+    const res = await request(app).patch('/api/admin/products/w1').set('Cookie', auth()).send({ type: 'event', isPublished: true })
+    expect(res.status).toBe(200)
+    const data = prismaMock.product.update.mock.calls[0][0].data
+    expect(data.type).toBe('event')
+    expect(data.eventConfig.startsAt).toBe('2027-01-22T15:00:00.000Z')
+    expect(data.eventConfig.fields.map((f: EventField) => f.role)).toEqual(['name', 'email', 'phone'])
+    expect(res.body.data.isPublished).toBe(true)
+    expect(res.body.data.eventProblems).toEqual(['Falta al menos una modalidad de pago'])
+  })
+
+  it('the date edited in «Editar» goes into the event configuration', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({ ...WORKSHOP, type: 'event', eventConfig: CONFIG })
+    await request(app).patch('/api/admin/products/w1').set('Cookie', auth()).send({ eventDate: '2027-02-01T15:00:00.000Z' })
+    const data = prismaMock.product.update.mock.calls[0][0].data
+    expect(data.eventConfig.startsAt).toBe('2027-02-01T15:00:00.000Z')
+    expect(data.eventConfig.capacity).toBe(2)
+    expect(data.eventDate).toEqual(new Date('2027-02-01T15:00:00.000Z'))
+  })
+
+  it('an incomplete event shows «próximamente» and rejects registrations', () => {
+    const incomplete = { ...CONFIG, paymentOptions: [] }
+    expect(registrationAvailability(incomplete, 0, NOW, eventPublishProblems(incomplete, 180000).length === 0).status).toBe('not_started')
   })
 })

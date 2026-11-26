@@ -4,6 +4,7 @@ import { prisma, type TransactionClient } from '../lib/prisma.js'
 import { fail, ok } from '../lib/response.js'
 import {
   availablePaymentOptions,
+  eventPublishProblems,
   installmentsTotal,
   parseEventConfig,
   registrationAvailability,
@@ -121,7 +122,7 @@ export async function createEventRegistration(req: Request, res: Response): Prom
       })
       if (duplicate) throw new RegistrationClosedError('Ya existe una inscripción con este correo. Si necesitas cambiar algo, escríbenos.')
       const taken = await takenSeats(product.id, now, tx)
-      const availability = registrationAvailability(config, taken, now)
+      const availability = registrationAvailability(config, taken, now, eventPublishProblems(config, product.price).length === 0)
       if (availability.status !== 'open' && availability.status !== 'waitlist') {
         throw new RegistrationClosedError(CLOSED_MESSAGES[availability.status] ?? 'Las inscripciones están cerradas.')
       }
