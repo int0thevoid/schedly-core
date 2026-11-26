@@ -6,8 +6,7 @@
   "types": "./src/index.ts",
   "scripts": {
     "generate": "prisma generate",
-    "start": "node scripts/build-server.mjs && node --enable-source-maps dist/server.mjs",
-    "start:tsx": "tsx src/server.ts",
+    "start": "tsx src/server.ts",
     "dev": "nodemon --exec tsx src/server.ts",
     "build": "tsc",
     "test": "vitest run",
@@ -42,7 +41,6 @@
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "esbuild": "0.28.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.2",
     "helmet": "^8.2.0",
