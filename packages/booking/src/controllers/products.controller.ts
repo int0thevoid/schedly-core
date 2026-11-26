@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma.js'
 import { fail, ok } from '../lib/response.js'
 import type { Product } from '../generated/prisma/index.js'
 import { IMAGE_DATA_URL_PATTERN, serializeProduct } from '../lib/products.js'
-import { parseEventConfig, publicEventConfig } from '../lib/events.js'
+import { parseEventConfig, publicAvailability, publicEventConfig } from '../lib/events.js'
 import { eventAvailability } from '../lib/event-registrations.js'
 
 function professionalId(): string {
@@ -16,9 +16,10 @@ async function serializePublicProduct(product: Product) {
   void eventConfig
   if (product.type !== 'event') return { ...rest, event: null }
   const now = new Date()
+  const config = parseEventConfig(product.eventConfig)
   return {
     ...rest,
-    event: { config: publicEventConfig(parseEventConfig(product.eventConfig), now), availability: await eventAvailability(product, now) },
+    event: { config: publicEventConfig(config, now), availability: publicAvailability(await eventAvailability(product, now), config) },
   }
 }
 
