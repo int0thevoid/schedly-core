@@ -1,10 +1,12 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
+import { perClientLimit } from '../lib/rate-limit.js'
 import { getProductImage, getPublicProduct, listPublicProducts } from '../controllers/products.controller.js'
 import { createEventRegistration } from '../controllers/events.controller.js'
 
 // Inscripciones a eventos: pocas por persona; frena bots y envíos repetidos.
 const registrationLimiter = rateLimit({
+  ...perClientLimit,
   windowMs: 60 * 60 * 1000,
   limit: 10,
   standardHeaders: true,
