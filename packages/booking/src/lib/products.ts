@@ -1,6 +1,6 @@
 import type { Product } from '../generated/prisma/index.js'
 
-export const PRODUCT_TYPES = ['ebook', 'toy', 'workshop'] as const
+export const PRODUCT_TYPES = ['ebook', 'toy', 'workshop', 'event'] as const
 
 // Mismo formato y tope que la foto de perfil (ver professional.controller.ts).
 export const MAX_IMAGE_DATA_URL_LENGTH = 4_500_000

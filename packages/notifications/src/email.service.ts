@@ -8,6 +8,14 @@ import { professionalCancellationNoticeTemplate, type ProfessionalCancellationNo
 import { professionalRescheduleNoticeTemplate, type ProfessionalRescheduleNoticeData } from './templates/professional-reschedule-notice.js'
 import { reviewRequestTemplate, type ReviewRequestData } from './templates/review-request.js'
 import { dailyDigestTemplate, type DailyDigestData } from './templates/daily-digest.js'
+import {
+  eventRegistrationProfessionalTemplate,
+  eventRegistrationReceivedTemplate,
+  eventRegistrationStatusTemplate,
+  type EventRegistrationProfessionalData,
+  type EventRegistrationReceivedData,
+  type EventRegistrationStatusData,
+} from './templates/event-registration.js'
 import { generateICSFile } from './utils/ics-generator.js'
 
 type Attachment = { filename: string; content: Buffer }
@@ -102,6 +110,21 @@ export class EmailService {
 
   async sendDailyDigest(to: string, data: DailyDigestData): Promise<void> {
     const { subject, html } = dailyDigestTemplate(data)
+    await this.send(to, subject, html)
+  }
+
+  async sendEventRegistrationReceived(to: string, data: EventRegistrationReceivedData): Promise<void> {
+    const { subject, html } = eventRegistrationReceivedTemplate(data)
+    await this.send(to, subject, html)
+  }
+
+  async sendEventRegistrationStatus(to: string, data: EventRegistrationStatusData): Promise<void> {
+    const { subject, html } = eventRegistrationStatusTemplate(data)
+    await this.send(to, subject, html)
+  }
+
+  async sendEventRegistrationToProfessional(to: string, data: EventRegistrationProfessionalData): Promise<void> {
+    const { subject, html } = eventRegistrationProfessionalTemplate(data)
     await this.send(to, subject, html)
   }
 
