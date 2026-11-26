@@ -50,7 +50,8 @@ const ALLOWED_ORIGINS = [
 const app = express()
 
 app.use(helmet())
-app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }))
+// Content-Disposition: el panel lee el nombre del archivo de las exportaciones (US-123).
+app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true, exposedHeaders: ['Content-Disposition'] }))
 // Límite elevado (default de Express es 100kb) para aceptar la foto de perfil como data URL
 // en el body de PATCH /api/admin/professional — ver professional.controller.ts.
 app.use(express.json({ limit: '6mb' }))

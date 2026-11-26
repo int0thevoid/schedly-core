@@ -111,7 +111,11 @@ function logEmailError(what: string) {
 }
 
 /** Correos al inscribirse: comprobante a la participante y aviso (sin datos de salud) a la profesional. */
-export async function sendRegistrationEmails(registrationId: string): Promise<void> {
+export function sendRegistrationEmails(registrationId: string): Promise<void> {
+  return registrationEmails(registrationId).catch(logEmailError('los correos de inscripción'))
+}
+
+async function registrationEmails(registrationId: string): Promise<void> {
   const reg = await prisma.eventRegistration.findUnique({ where: { id: registrationId }, include: { payments: true, product: true } })
   if (!reg) return
   const config = parseEventConfig(reg.product.eventConfig)
@@ -157,7 +161,11 @@ export async function sendRegistrationEmails(registrationId: string): Promise<vo
 }
 
 /** Correo cuando un abono confirma el cupo o completa el pago. */
-export async function sendStatusEmail(registrationId: string, kind: 'reserved' | 'paid'): Promise<void> {
+export function sendStatusEmail(registrationId: string, kind: 'reserved' | 'paid'): Promise<void> {
+  return statusEmail(registrationId, kind).catch(logEmailError('el correo de estado'))
+}
+
+async function statusEmail(registrationId: string, kind: 'reserved' | 'paid'): Promise<void> {
   const reg = await prisma.eventRegistration.findUnique({ where: { id: registrationId }, include: { payments: true, product: true } })
   if (!reg) return
   const config = parseEventConfig(reg.product.eventConfig)
