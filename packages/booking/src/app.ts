@@ -27,6 +27,8 @@ import reviewsRouter from './routes/reviews.js'
 import adminReviewsRouter from './routes/admin/reviews.js'
 import productsRouter from './routes/products.js'
 import adminProductsRouter from './routes/admin/products.js'
+import eventsRouter from './routes/events.js'
+import adminEventsRouter from './routes/admin/events.js'
 import { getTransferConfig } from './controllers/admin/transfer.controller.js'
 import { getPublicConfig } from './controllers/admin/config.controller.js'
 import { getPublicProfessionalPhoto } from './controllers/admin/professional.controller.js'
@@ -101,6 +103,7 @@ app.use('/api/appointments', appointmentsRouter)
 app.use('/api/clients', clientsRouter)
 app.use('/api/reviews', reviewsRouter)
 app.use('/api/products', productsRouter)
+app.use('/api/event-registrations', eventsRouter)
 
 // Public: booking wizard needs these without auth
 app.get('/api/config', getPublicConfig)
@@ -124,6 +127,7 @@ app.use('/api/admin/google-calendar', adminGoogleCalendarOauthRouter)
 app.use('/api/admin/finance', adminFinanceRouter)
 app.use('/api/admin/audit', adminAuditRouter)
 app.use('/api/admin/reviews', adminReviewsRouter)
+app.use('/api/admin', adminEventsRouter)
 app.use('/api/admin/products', adminProductsRouter)
 app.get('/api/admin/availability', getAdminDayAvailability)
 

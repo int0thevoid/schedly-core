@@ -1,10 +1,25 @@
 import type { Request, Response } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { fail, ok } from '../lib/response.js'
+import type { Product } from '../generated/prisma/index.js'
 import { IMAGE_DATA_URL_PATTERN, serializeProduct } from '../lib/products.js'
+import { parseEventConfig, publicEventConfig } from '../lib/events.js'
+import { eventAvailability } from '../lib/event-registrations.js'
 
 function professionalId(): string {
   return process.env.PROFESSIONAL_ID ?? ''
+}
+
+/** En la web, un evento muestra su configuración pública y los cupos; los demás productos no la tienen. */
+async function serializePublicProduct(product: Product) {
+  const { eventConfig, ...rest } = serializeProduct(product)
+  void eventConfig
+  if (product.type !== 'event') return { ...rest, event: null }
+  const now = new Date()
+  return {
+    ...rest,
+    event: { config: publicEventConfig(parseEventConfig(product.eventConfig), now), availability: await eventAvailability(product, now) },
+  }
 }
 
 export async function listPublicProducts(_req: Request, res: Response): Promise<void> {
@@ -12,7 +27,7 @@ export async function listPublicProducts(_req: Request, res: Response): Promise<
     where: { professionalId: professionalId(), isPublished: true },
     orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
   })
-  ok(res, products.map(serializeProduct))
+  ok(res, await Promise.all(products.map(serializePublicProduct)))
 }
 
 export async function getPublicProduct(req: Request, res: Response): Promise<void> {
@@ -23,7 +38,7 @@ export async function getPublicProduct(req: Request, res: Response): Promise<voi
     fail(res, 'Product not found', 404)
     return
   }
-  ok(res, serializeProduct(product))
+  ok(res, await serializePublicProduct(product))
 }
 
 /** La URL lleva ?v=<updatedAt>, así que se puede cachear largo: una foto nueva cambia la URL. */
