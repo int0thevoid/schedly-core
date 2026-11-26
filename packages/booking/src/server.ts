@@ -3,6 +3,7 @@ import { runNotificationsJob } from './jobs/notifications.job.js'
 import { runWithAuditContext } from './lib/audit-context.js'
 import { purgeExpiredAuditLogs } from './lib/prisma.js'
 import { purgeExpiredSensitiveData } from './lib/event-registrations.js'
+import { optimizeStoredProductImages } from './lib/product-images.js'
 
 const port = Number(process.env.PORT ?? 3001)
 const NOTIFICATIONS_JOB_INTERVAL_MS = 15 * 60 * 1000
@@ -39,3 +40,8 @@ setInterval(runAuditRetention, AUDIT_RETENTION_JOB_INTERVAL_MS)
 
 runEventDataRetention()
 setInterval(runEventDataRetention, AUDIT_RETENTION_JOB_INTERVAL_MS)
+
+// Fotos de la vitrina subidas antes de US-124: se optimizan una vez al arrancar.
+runWithAuditContext({ actorType: 'system', source: 'job:optimize-product-images' }, optimizeStoredProductImages)
+  .then((count) => count > 0 && console.log(`[product-images] ${count} fotos de la vitrina optimizadas`))
+  .catch((err) => console.error('[product-images] optimization job failed', err))

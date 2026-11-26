@@ -4,6 +4,7 @@ import { Prisma } from '../../generated/prisma/index.js'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
 import { eventConfigSchema, eventPublishProblems, type EventConfig } from '../../lib/events.js'
+import { productImageFields } from '../../lib/product-images.js'
 import { IMAGE_DATA_URL_PATTERN, MAX_IMAGE_DATA_URL_LENGTH, PRODUCT_TYPES, serializeProduct, slugify } from '../../lib/products.js'
 
 const productBodySchema = z.object({
@@ -43,10 +44,11 @@ function zodMessage(error: z.ZodError): string {
 
 const reorderSchema = z.object({ ids: z.array(z.string().min(1)).min(1) })
 
-function toData(body: Partial<z.infer<typeof productBodySchema>>) {
-  const { externalUrl, eventDate, eventConfig, ...rest } = body
+async function toData(body: Partial<z.infer<typeof productBodySchema>>) {
+  const { externalUrl, eventDate, eventConfig, imageData, ...rest } = body
   return {
     ...rest,
+    ...(await productImageFields(imageData)),
     ...(eventConfig !== undefined ? { eventConfig: eventConfig ?? Prisma.DbNull } : {}),
     ...(externalUrl !== undefined ? { externalUrl: externalUrl || null } : {}),
     ...(eventDate !== undefined ? { eventDate: eventDate ? new Date(eventDate) : null } : {}),
@@ -86,7 +88,7 @@ export async function createProduct(req: Request, res: Response): Promise<void> 
   const last = await prisma.product.findFirst({ where: { professionalId }, orderBy: { position: 'desc' }, select: { position: true } })
   const product = await prisma.product.create({
     data: {
-      ...toData(parsed.data),
+      ...(await toData(parsed.data)),
       type: parsed.data.type,
       name: parsed.data.name,
       summary: parsed.data.summary,
@@ -127,7 +129,7 @@ export async function updateProduct(req: Request, res: Response): Promise<void> 
     fail(res, problem, 400)
     return
   }
-  const product = await prisma.product.update({ where: { id }, data: toData(parsed.data) })
+  const product = await prisma.product.update({ where: { id }, data: await toData(parsed.data) })
   ok(res, serializeProduct(product))
 }
 

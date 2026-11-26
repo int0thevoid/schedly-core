@@ -20,9 +20,12 @@ export function slugify(text: string): string {
 
 /** La foto no viaja en el JSON (puede pesar MB): se sirve aparte, versionada con updatedAt. */
 export function serializeProduct(product: Product) {
-  const { imageData, ...rest } = product
+  const { imageData, imageThumbData, ...rest } = product
+  const base = `/api/products/${product.id}/image?v=${product.updatedAt.getTime()}`
   return {
     ...rest,
-    imageUrl: imageData ? `/api/products/${product.id}/image?v=${product.updatedAt.getTime()}` : null,
+    imageUrl: imageData ? base : null,
+    // Miniatura para las tarjetas del catálogo (US-124); sin miniatura, la foto completa.
+    thumbUrl: imageData ? (imageThumbData ? `${base}&size=thumb` : base) : null,
   }
 }
