@@ -3,6 +3,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 import rateLimit from 'express-rate-limit'
+import { perClientLimit } from './lib/rate-limit.js'
 import type { NextFunction, Request, Response } from 'express'
 import { requireAuth } from './middleware/auth.js'
 import authRouter from './routes/auth.routes.js'
@@ -76,12 +77,14 @@ app.use((req, _res, next) => {
 // Defensa en profundidad contra fuerza bruta/abuso — no había ningún límite
 // de tasa en ningún endpoint, incluyendo el login admin.
 const apiLimiter = rateLimit({
+  ...perClientLimit,
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
 })
 const loginLimiter = rateLimit({
+  ...perClientLimit,
   windowMs: 15 * 60 * 1000,
   limit: 10,
   standardHeaders: true,
