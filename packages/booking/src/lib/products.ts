@@ -1,6 +1,6 @@
 import type { Product } from '../generated/prisma/index.js'
 
-export const PRODUCT_TYPES = ['ebook', 'toy', 'workshop'] as const
+export const PRODUCT_TYPES = ['ebook', 'toy', 'workshop', 'event'] as const
 
 // Mismo formato y tope que la foto de perfil (ver professional.controller.ts).
 export const MAX_IMAGE_DATA_URL_LENGTH = 4_500_000
@@ -20,9 +20,12 @@ export function slugify(text: string): string {
 
 /** La foto no viaja en el JSON (puede pesar MB): se sirve aparte, versionada con updatedAt. */
 export function serializeProduct(product: Product) {
-  const { imageData, ...rest } = product
+  const { imageData, imageThumbData, ...rest } = product
+  const base = `/api/products/${product.id}/image?v=${product.updatedAt.getTime()}`
   return {
     ...rest,
-    imageUrl: imageData ? `/api/products/${product.id}/image?v=${product.updatedAt.getTime()}` : null,
+    imageUrl: imageData ? base : null,
+    // Miniatura para las tarjetas del catálogo (US-124); sin miniatura, la foto completa.
+    thumbUrl: imageData ? (imageThumbData ? `${base}&size=thumb` : base) : null,
   }
 }

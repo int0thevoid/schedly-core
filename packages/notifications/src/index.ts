@@ -17,6 +17,7 @@ export * from './templates/professional-reschedule-notice.js'
 export * from './templates/review-request.js'
 export * from './templates/confirm-attendance-page.js'
 export * from './templates/daily-digest.js'
+export * from './templates/event-registration.js'
 export { generateGoogleCalendarUrl } from './utils/google-calendar.js'
 export { generateICSFile, type ICSParams } from './utils/ics-generator.js'
 export {

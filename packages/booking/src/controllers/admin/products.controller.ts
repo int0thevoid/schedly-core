@@ -1,7 +1,10 @@
 import type { Request, Response } from 'express'
 import { z } from 'zod'
+import { Prisma } from '../../generated/prisma/index.js'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
+import { eventConfigSchema, eventPublishProblems, type EventConfig } from '../../lib/events.js'
+import { productImageFields } from '../../lib/product-images.js'
 import { IMAGE_DATA_URL_PATTERN, MAX_IMAGE_DATA_URL_LENGTH, PRODUCT_TYPES, serializeProduct, slugify } from '../../lib/products.js'
 
 const productBodySchema = z.object({
@@ -22,16 +25,35 @@ const productBodySchema = z.object({
   externalUrl: z.union([z.string().trim().url('El enlace debe empezar con https://').startsWith('https://', 'El enlace debe empezar con https://'), z.literal(''), z.null()]).optional(),
   eventDate: z.union([z.string().datetime({ offset: true }), z.null()]).optional(),
   isPublished: z.boolean().optional(),
+  eventConfig: z.union([eventConfigSchema, z.null()]).optional(),
 })
+
+/** Un evento solo se publica si su configuración está completa; como borrador se guarda igual. */
+function publishProblems(type: string, price: number, isPublished: boolean, config: EventConfig | null | undefined): string | null {
+  if (type !== 'event' || !isPublished) return null
+  const problems = eventPublishProblems(eventConfigSchema.parse(config ?? {}), price)
+  return problems.length ? `No se puede publicar todavía: ${problems.join('; ')}` : null
+}
+
+function zodMessage(error: z.ZodError): string {
+  const issue = error.issues[0]
+  if (!issue) return 'Invalid body'
+  const path = issue.path.join('.')
+  return path.startsWith('eventConfig') ? `${issue.message} (${path})` : issue.message
+}
 
 const reorderSchema = z.object({ ids: z.array(z.string().min(1)).min(1) })
 
-function toData(body: Partial<z.infer<typeof productBodySchema>>) {
-  const { externalUrl, eventDate, ...rest } = body
+async function toData(body: Partial<z.infer<typeof productBodySchema>>) {
+  const { externalUrl, eventDate, eventConfig, imageData, ...rest } = body
   return {
     ...rest,
+    ...(await productImageFields(imageData)),
+    ...(eventConfig !== undefined ? { eventConfig: eventConfig ?? Prisma.DbNull } : {}),
     ...(externalUrl !== undefined ? { externalUrl: externalUrl || null } : {}),
     ...(eventDate !== undefined ? { eventDate: eventDate ? new Date(eventDate) : null } : {}),
+    // La fecha del evento vive en su configuración; se copia a eventDate para el catálogo.
+    ...(eventConfig?.startsAt ? { eventDate: new Date(eventConfig.startsAt) } : {}),
   }
 }
 
@@ -54,16 +76,28 @@ export async function listAdminProducts(req: Request, res: Response): Promise<vo
 export async function createProduct(req: Request, res: Response): Promise<void> {
   const parsed = productBodySchema.safeParse(req.body)
   if (!parsed.success) {
-    fail(res, parsed.error.issues[0]?.message ?? 'Invalid body', 400)
+    fail(res, zodMessage(parsed.error), 400)
+    return
+  }
+  const problem = publishProblems(parsed.data.type, parsed.data.price, parsed.data.isPublished ?? false, parsed.data.eventConfig)
+  if (problem) {
+    fail(res, problem, 400)
     return
   }
   const professionalId = req.professionalId ?? ''
   const last = await prisma.product.findFirst({ where: { professionalId }, orderBy: { position: 'desc' }, select: { position: true } })
   const product = await prisma.product.create({
     data: {
-      ...parsed.data,
+      ...(await toData(parsed.data)),
+      type: parsed.data.type,
+      name: parsed.data.name,
+      summary: parsed.data.summary,
+      price: parsed.data.price,
+      eventConfig: parsed.data.type === 'event' ? (parsed.data.eventConfig ?? eventConfigSchema.parse({})) : Prisma.DbNull,
       externalUrl: parsed.data.externalUrl || null,
-      eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
+      eventDate: parsed.data.eventConfig?.startsAt
+        ? new Date(parsed.data.eventConfig.startsAt)
+        : parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
       professionalId,
       slug: await uniqueSlug(parsed.data.name),
       position: (last?.position ?? -1) + 1,
@@ -76,16 +110,26 @@ export async function createProduct(req: Request, res: Response): Promise<void> 
 export async function updateProduct(req: Request, res: Response): Promise<void> {
   const parsed = productBodySchema.partial().safeParse(req.body)
   if (!parsed.success) {
-    fail(res, parsed.error.issues[0]?.message ?? 'Invalid body', 400)
+    fail(res, zodMessage(parsed.error), 400)
     return
   }
   const id = String(req.params.id)
-  const existing = await prisma.product.findFirst({ where: { id, professionalId: req.professionalId ?? '' }, select: { id: true } })
+  const existing = await prisma.product.findFirst({ where: { id, professionalId: req.professionalId ?? '' } })
   if (!existing) {
     fail(res, 'Product not found', 404)
     return
   }
-  const product = await prisma.product.update({ where: { id }, data: toData(parsed.data) })
+  const problem = publishProblems(
+    parsed.data.type ?? existing.type,
+    parsed.data.price ?? existing.price,
+    parsed.data.isPublished ?? existing.isPublished,
+    parsed.data.eventConfig !== undefined ? parsed.data.eventConfig : (existing.eventConfig as EventConfig | null),
+  )
+  if (problem) {
+    fail(res, problem, 400)
+    return
+  }
+  const product = await prisma.product.update({ where: { id }, data: await toData(parsed.data) })
   ok(res, serializeProduct(product))
 }
 
@@ -94,6 +138,11 @@ export async function deleteProduct(req: Request, res: Response): Promise<void> 
   const existing = await prisma.product.findFirst({ where: { id, professionalId: req.professionalId ?? '' }, select: { id: true } })
   if (!existing) {
     fail(res, 'Product not found', 404)
+    return
+  }
+  const registrations = await prisma.eventRegistration.count({ where: { productId: id } })
+  if (registrations > 0) {
+    fail(res, 'Este evento tiene inscripciones: ocúltalo en vez de eliminarlo (o elimina primero las inscripciones).', 409)
     return
   }
   await prisma.product.delete({ where: { id } })

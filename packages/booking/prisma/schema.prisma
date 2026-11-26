@@ -269,7 +269,7 @@ model Product {
   professional   Professional @relation(fields: [professionalId], references: [id])
 
   slug        String    @unique
-  type        String // 'ebook' | 'toy' | 'workshop'
+  type        String // 'ebook' | 'toy' | 'workshop' | 'event'
   name        String
   summary     String
   description String    @default("")
@@ -277,16 +277,78 @@ model Product {
   price       Int       @default(0)
   // Data URL de la foto, igual que Professional.photoUrl (el filesystem no persiste entre deploys).
   imageData   String?
+  // Miniatura WebP para el catálogo (US-124); null si la foto aún no se optimizó.
+  imageThumbData String?
   externalUrl String?
   // Solo talleres
   eventDate   DateTime?
   isPublished Boolean   @default(false)
   position    Int       @default(0)
+  // Solo eventos (US-123): toda la configuración editable desde el panel (ver lib/events.ts).
+  eventConfig Json?
+
+  registrations EventRegistration[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([professionalId, isPublished, position])
+}
+
+// Inscripción a un evento de la vitrina (US-123). Guarda una copia de lo que la persona vio y aceptó
+// (formulario, modalidad de pago, consentimientos y documentos), para que editar el evento después no
+// cambie lo ya aceptado. Los datos de salud van aparte (sensitiveAnswers): no salen en correos ni en
+// exportaciones generales, solo los ve la cuenta principal y se borran según el plazo del evento.
+model EventRegistration {
+  id             String  @id @default(cuid())
+  professionalId String
+  productId      String
+  product        Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  // Enlace del comprobante (/vitrina/inscripcion/<token>).
+  token  String @unique
+  // pending | reserved | paid | cancelled | waitlist
+  status String @default("pending")
+
+  name  String
+  email String
+  phone String @default("")
+
+  answers          Json
+  sensitiveAnswers Json?
+  formSnapshot     Json
+  paymentOptionId  String
+  paymentSnapshot  Json
+  totalAmount      Int
+  acceptedTerms    Json
+
+  // Mientras no vence, una inscripción pendiente ocupa cupo.
+  holdExpiresAt     DateTime?
+  notes             String    @default("")
+  cancelledAt       DateTime?
+  sensitivePurgedAt DateTime?
+
+  payments EventPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, status])
+  @@index([professionalId, createdAt])
+}
+
+model EventPayment {
+  id             String            @id @default(cuid())
+  registrationId String
+  registration   EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  amount         Int
+  paidAt         DateTime
+  method         String            @default("")
+  note           String            @default("")
+
+  createdAt DateTime @default(now())
+
+  @@index([registrationId])
 }
 
 // Cuentas adicionales del panel (además de la de la profesional, que entra con Professional.email).
