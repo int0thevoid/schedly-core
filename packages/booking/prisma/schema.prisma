@@ -277,6 +277,8 @@ model Product {
   price       Int       @default(0)
   // Data URL de la foto, igual que Professional.photoUrl (el filesystem no persiste entre deploys).
   imageData   String?
+  // Miniatura WebP para el catálogo (US-124); null si la foto aún no se optimizó.
+  imageThumbData String?
   externalUrl String?
   // Solo talleres
   eventDate   DateTime?

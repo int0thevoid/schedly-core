@@ -45,10 +45,11 @@ export async function getPublicProduct(req: Request, res: Response): Promise<voi
 export async function getProductImage(req: Request, res: Response): Promise<void> {
   const product = await prisma.product.findFirst({
     where: { id: String(req.params.id), professionalId: professionalId() },
-    select: { imageData: true },
+    select: { imageData: true, imageThumbData: true },
   })
-  const match = product?.imageData ? IMAGE_DATA_URL_PATTERN.exec(product.imageData) : null
-  if (!product?.imageData || !match) {
+  const data = (req.query.size === 'thumb' && product?.imageThumbData) || product?.imageData
+  const match = data ? IMAGE_DATA_URL_PATTERN.exec(data) : null
+  if (!data || !match) {
     fail(res, 'Image not found', 404)
     return
   }
@@ -57,5 +58,5 @@ export async function getProductImage(req: Request, res: Response): Promise<void
     'Cache-Control': 'public, max-age=31536000, immutable',
     'Cross-Origin-Resource-Policy': 'cross-origin',
   })
-  res.send(Buffer.from(product.imageData.slice(product.imageData.indexOf(',') + 1), 'base64'))
+  res.send(Buffer.from(data.slice(data.indexOf(',') + 1), 'base64'))
 }
