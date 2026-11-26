@@ -3,6 +3,7 @@ import type { EventPaymentSummary } from '@schedly/notifications'
 import { prisma } from './prisma.js'
 import { getEmailService } from './email-service.js'
 import {
+  eventPublishProblems,
   formatAnswer,
   occupiesSeat,
   parseEventConfig,
@@ -52,10 +53,11 @@ export async function takenSeats(productId: string, now: Date = new Date(), clie
   return rows.filter((r) => occupiesSeat(r, now)).length
 }
 
-export async function eventAvailability(product: Pick<Product, 'id' | 'eventConfig'>, now: Date = new Date()) {
+export async function eventAvailability(product: Pick<Product, 'id' | 'eventConfig' | 'price'>, now: Date = new Date()) {
   const config = parseEventConfig(product.eventConfig)
   const taken = await takenSeats(product.id, now)
-  return { ...registrationAvailability(config, taken, now), capacity: config.capacity, taken }
+  const ready = eventPublishProblems(config, product.price).length === 0
+  return { ...registrationAvailability(config, taken, now, ready), capacity: config.capacity, taken }
 }
 
 export function paymentSummary(option: EventPaymentOption, paid: number): EventPaymentSummary {

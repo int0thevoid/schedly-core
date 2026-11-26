@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { Prisma } from '../../generated/prisma/index.js'
 import { prisma } from '../../lib/prisma.js'
 import { fail, ok } from '../../lib/response.js'
-import { eventConfigSchema, eventPublishProblems, type EventConfig } from '../../lib/events.js'
+import type { Product } from '../../generated/prisma/index.js'
+import { defaultEventConfig, eventConfigSchema, eventPublishProblems, parseEventConfig, type EventConfig } from '../../lib/events.js'
 import { productImageFields } from '../../lib/product-images.js'
 import { IMAGE_DATA_URL_PATTERN, MAX_IMAGE_DATA_URL_LENGTH, PRODUCT_TYPES, serializeProduct, slugify } from '../../lib/products.js'
 
@@ -28,11 +29,26 @@ const productBodySchema = z.object({
   eventConfig: z.union([eventConfigSchema, z.null()]).optional(),
 })
 
-/** Un evento solo se publica si su configuración está completa; como borrador se guarda igual. */
-function publishProblems(type: string, price: number, isPublished: boolean, config: EventConfig | null | undefined): string | null {
-  if (type !== 'event' || !isPublished) return null
-  const problems = eventPublishProblems(eventConfigSchema.parse(config ?? {}), price)
-  return problems.length ? `No se puede publicar todavía: ${problems.join('; ')}` : null
+/** En el panel, cada evento trae lo que le falta para abrir inscripciones (no impide publicarlo). */
+function serializeAdminProduct(product: Product) {
+  return {
+    ...serializeProduct(product),
+    eventProblems: product.type === 'event' ? eventPublishProblems(parseEventConfig(product.eventConfig), product.price) : [],
+  }
+}
+
+/**
+ * Configuración final de un evento al guardar. La fecha de inicio vive en la configuración y en eventDate
+ * (catálogo): si se edita la fecha desde «Editar» o se convierte un taller con fecha en evento, se copia.
+ */
+function resolveEventConfig(
+  body: Partial<z.infer<typeof productBodySchema>>,
+  existing: Pick<Product, 'eventConfig' | 'eventDate'> | null,
+): EventConfig {
+  if (body.eventConfig) return body.eventConfig
+  const current = existing?.eventConfig ? parseEventConfig(existing.eventConfig) : defaultEventConfig()
+  const date = body.eventDate !== undefined ? body.eventDate : current.startsAt ? undefined : existing?.eventDate?.toISOString()
+  return date !== undefined ? { ...current, startsAt: date } : current
 }
 
 function zodMessage(error: z.ZodError): string {
@@ -70,7 +86,7 @@ export async function listAdminProducts(req: Request, res: Response): Promise<vo
     where: { professionalId: req.professionalId ?? '' },
     orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
   })
-  ok(res, products.map(serializeProduct))
+  ok(res, products.map(serializeAdminProduct))
 }
 
 export async function createProduct(req: Request, res: Response): Promise<void> {
@@ -79,11 +95,7 @@ export async function createProduct(req: Request, res: Response): Promise<void> 
     fail(res, zodMessage(parsed.error), 400)
     return
   }
-  const problem = publishProblems(parsed.data.type, parsed.data.price, parsed.data.isPublished ?? false, parsed.data.eventConfig)
-  if (problem) {
-    fail(res, problem, 400)
-    return
-  }
+  const eventConfig = parsed.data.type === 'event' ? resolveEventConfig(parsed.data, null) : null
   const professionalId = req.professionalId ?? ''
   const last = await prisma.product.findFirst({ where: { professionalId }, orderBy: { position: 'desc' }, select: { position: true } })
   const product = await prisma.product.create({
@@ -93,17 +105,17 @@ export async function createProduct(req: Request, res: Response): Promise<void> 
       name: parsed.data.name,
       summary: parsed.data.summary,
       price: parsed.data.price,
-      eventConfig: parsed.data.type === 'event' ? (parsed.data.eventConfig ?? eventConfigSchema.parse({})) : Prisma.DbNull,
+      eventConfig: eventConfig ?? Prisma.DbNull,
       externalUrl: parsed.data.externalUrl || null,
-      eventDate: parsed.data.eventConfig?.startsAt
-        ? new Date(parsed.data.eventConfig.startsAt)
+      eventDate: eventConfig?.startsAt
+        ? new Date(eventConfig.startsAt)
         : parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
       professionalId,
       slug: await uniqueSlug(parsed.data.name),
       position: (last?.position ?? -1) + 1,
     },
   })
-  ok(res, serializeProduct(product), 201)
+  ok(res, serializeAdminProduct(product), 201)
 }
 
 /** El slug no cambia al renombrar, para no romper enlaces ya compartidos. */
@@ -119,18 +131,10 @@ export async function updateProduct(req: Request, res: Response): Promise<void> 
     fail(res, 'Product not found', 404)
     return
   }
-  const problem = publishProblems(
-    parsed.data.type ?? existing.type,
-    parsed.data.price ?? existing.price,
-    parsed.data.isPublished ?? existing.isPublished,
-    parsed.data.eventConfig !== undefined ? parsed.data.eventConfig : (existing.eventConfig as EventConfig | null),
-  )
-  if (problem) {
-    fail(res, problem, 400)
-    return
-  }
-  const product = await prisma.product.update({ where: { id }, data: await toData(parsed.data) })
-  ok(res, serializeProduct(product))
+  const isEvent = (parsed.data.type ?? existing.type) === 'event'
+  const data = isEvent ? { ...parsed.data, eventConfig: resolveEventConfig(parsed.data, existing) } : parsed.data
+  const product = await prisma.product.update({ where: { id }, data: await toData(data) })
+  ok(res, serializeAdminProduct(product))
 }
 
 export async function deleteProduct(req: Request, res: Response): Promise<void> {
@@ -164,5 +168,5 @@ export async function reorderProducts(req: Request, res: Response): Promise<void
   }
   await prisma.$transaction(parsed.data.ids.map((id, position) => prisma.product.update({ where: { id }, data: { position } })))
   const products = await prisma.product.findMany({ where: { professionalId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] })
-  ok(res, products.map(serializeProduct))
+  ok(res, products.map(serializeAdminProduct))
 }

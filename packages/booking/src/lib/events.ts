@@ -142,11 +142,27 @@ export function parseEventConfig(value: unknown): EventConfig {
   return eventConfigSchema.parse(value ?? {})
 }
 
+/** Configuración con la que parte un evento nuevo: solo lo mínimo para identificar a quien se inscribe. */
+export function defaultEventConfig(startsAt: string | null = null): EventConfig {
+  const base = { help: '', options: [], min: null, max: null, rangeMessage: '', category: 'general' as const, showIf: null }
+  return eventConfigSchema.parse({
+    startsAt,
+    fields: [
+      { ...base, id: 'nombre', type: 'short_text', label: 'Nombre completo', required: true, role: 'name' },
+      { ...base, id: 'correo', type: 'email', label: 'Correo electrónico', required: true, role: 'email' },
+      { ...base, id: 'whatsapp', type: 'phone', label: 'WhatsApp', required: true, role: 'phone' },
+    ],
+  })
+}
+
 export function installmentsTotal(option: Pick<EventPaymentOption, 'installments'>): number {
   return option.installments.reduce((sum, i) => sum + i.amount, 0)
 }
 
-/** Problemas que impiden publicar el evento. Un borrador se puede guardar igual. */
+/**
+ * Lo que falta para abrir las inscripciones. El evento se puede publicar igual: mientras falte algo, la
+ * web lo muestra con «Inscripciones próximamente» y sin formulario.
+ */
 export function eventPublishProblems(config: EventConfig, price: number): string[] {
   const problems: string[] = []
   if (!config.startsAt) problems.push('Falta la fecha de inicio del evento')
@@ -219,10 +235,11 @@ export function registrationAvailability(
   config: EventConfig,
   taken: number,
   now: Date = new Date(),
+  ready = true,
 ): { status: RegistrationAvailability; remaining: number | null } {
   const remaining = config.capacity === null ? null : Math.max(0, config.capacity - taken)
   const closesAt = config.registrationClosesAt ?? config.startsAt
-  if (!config.startsAt) return { status: 'not_started', remaining }
+  if (!config.startsAt || !ready) return { status: 'not_started', remaining }
   if (closesAt && new Date(closesAt) <= now) return { status: 'closed', remaining }
   if (remaining === 0) return { status: config.waitlistEnabled ? 'waitlist' : 'full', remaining }
   return { status: 'open', remaining }
